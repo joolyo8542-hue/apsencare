@@ -1499,7 +1499,7 @@
         auth.onAuthStateChanged(async (user) => {
             if (!user) {
                 console.log('로그인 필요');
-                window.location.href = 'apsencare_login_firebase.html';
+                window.location.href = 'index.html';
                 return;
             }
 
@@ -1528,7 +1528,7 @@
                 try {
                     await auth.signOut();
                     sessionStorage.removeItem('apsencare_user');
-                    window.location.href = 'apsencare_login_firebase.html';
+                    window.location.href = 'index.html';
                 } catch (error) {
                     console.error('로그아웃 오류:', error);
                     alert('로그아웃 중 오류가 발생했습니다.');

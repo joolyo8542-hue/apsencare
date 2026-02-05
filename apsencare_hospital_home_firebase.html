@@ -1041,7 +1041,7 @@
             if (!user) {
                 // 미로그인 시 로그인 페이지로 이동
                 console.log('로그인 필요');
-                window.location.href = 'apsencare_login_firebase.html';
+                window.location.href = 'index.html';
                 return;
             }
 
@@ -1125,7 +1125,7 @@
                 try {
                     await auth.signOut();
                     sessionStorage.removeItem('apsencare_user');
-                    window.location.href = 'apsencare_login_firebase.html';
+                    window.location.href = 'index.html';
                 } catch (error) {
                     console.error('로그아웃 오류:', error);
                     alert('로그아웃 중 오류가 발생했습니다.');
