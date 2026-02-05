@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦷 앞선케어 - 관리자</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: #f9fafb;
+            color: #1a1a1a;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .app-layout { display: flex; min-height: 100vh; }
+
+        /* ===== 사이드바 ===== */
+        .sidebar {
+            width: 260px;
+            background: #1f2937;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #374151;
+        }
+
+        .logo { display: flex; align-items: center; gap: 12px; }
+
+        .logo-icon {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+        }
+
+        .logo-text { font-size: 18px; font-weight: 700; color: white; }
+        .logo-sub { font-size: 11px; color: #9ca3af; }
+
+        .nav-section { flex: 1; padding: 12px 0; overflow-y: auto; }
+
+        .nav-group-title {
+            padding: 12px 20px 8px;
+            font-size: 11px; font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 20px;
+            color: #9ca3af;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover { background: #374151; color: #fbbf24; }
+
+        .nav-item.active {
+            background: #374151;
+            color: #fbbf24;
+            border-left-color: #fbbf24;
+            font-weight: 600;
+        }
+
+        .nav-icon { width: 20px; text-align: center; font-size: 16px; }
+        .nav-label { flex: 1; }
+
+        .nav-badge {
+            background: #6b7280; color: white;
+            font-size: 10px; padding: 2px 8px;
+            border-radius: 10px; font-weight: 600;
+        }
+
+        .nav-badge.alert { background: #ef4444; }
+
+        .nav-divider { height: 1px; background: #374151; margin: 12px 20px; }
+
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #374151;
+            background: #111827;
+        }
+
+        .user-card { display: flex; align-items: center; gap: 12px; }
+
+        .user-avatar {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 14px; font-weight: 600;
+        }
+
+        .user-info { flex: 1; }
+        .user-name { font-size: 13px; font-weight: 600; color: white; }
+        .user-role { font-size: 11px; color: #9ca3af; }
+
+        .logout-btn {
+            background: none; border: none; color: #6b7280;
+            cursor: pointer; padding: 6px; border-radius: 6px;
+            transition: all 0.2s; font-size: 14px;
+        }
+
+        .logout-btn:hover { background: #374151; color: #ef4444; }
+
+        /* ===== 메인 콘텐츠 ===== */
+        .main-content { flex: 1; margin-left: 260px; }
+
+        .top-header {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 16px 32px;
+            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 50;
+        }
+
+        .page-title h1 { font-size: 20px; font-weight: 700; color: #1f2937; }
+        .page-title p { font-size: 13px; color: #6b7280; margin-top: 2px; }
+
+        .header-actions { display: flex; gap: 12px; }
+
+        .btn {
+            padding: 10px 18px; border-radius: 8px;
+            font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; gap: 8px; border: none;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.3);
+        }
+
+        .btn-secondary { background: #f3f4f6; color: #4b5563; }
+        .btn-secondary:hover { background: #e5e7eb; }
+
+        .btn-danger { background: #fee2e2; color: #dc2626; }
+        .btn-danger:hover { background: #fecaca; }
+
+        .content-area { padding: 32px; }
+
+        /* 탭 콘텐츠 표시/숨김 */
+        .tab-page { display: none; }
+        .tab-page.active { display: block; }
+
+        /* ===== 통계 카드 ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px; margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: #fbbf24;
+            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.1);
+        }
+
+        .stat-card .stat-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .stat-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+        }
+
+        .stat-icon.yellow { background: #fef3c7; }
+        .stat-icon.green { background: #dcfce7; }
+        .stat-icon.blue { background: #dbeafe; }
+        .stat-icon.pink { background: #fce7f3; }
+
+        .stat-value { font-size: 32px; font-weight: 700; color: #1f2937; }
+        .stat-label { font-size: 13px; color: #6b7280; margin-top: 4px; }
+
+        .stat-link {
+            font-size: 11px; color: #f59e0b; margin-top: 8px;
+            display: flex; align-items: center; gap: 4px;
+        }
+
+        /* ===== 카드 ===== */
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 16px; font-weight: 700; color: #1f2937;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .card-link {
+            font-size: 12px; color: #f59e0b;
+            text-decoration: none; font-weight: 600;
+            cursor: pointer;
+        }
+
+        .card-link:hover { text-decoration: underline; }
+
+        /* ===== 전체현황 - 간략 미니 리스트 ===== */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px; margin-bottom: 24px;
+        }
+
+        .mini-list-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .mini-list-item:last-child { border-bottom: none; }
+
+        .mini-list-icon {
+            width: 36px; height: 36px;
+            background: #f3f4f6; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0;
+        }
+
+        .mini-list-info { flex: 1; min-width: 0; }
+
+        .mini-list-name {
+            font-size: 13px; font-weight: 600; color: #1f2937;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .mini-list-sub {
+            font-size: 11px; color: #9ca3af; margin-top: 1px;
+        }
+
+        .mini-list-badge {
+            padding: 3px 10px; border-radius: 12px;
+            font-size: 11px; font-weight: 600; white-space: nowrap;
+        }
+
+        .mini-list-badge.active { background: #dcfce7; color: #16a34a; }
+        .mini-list-badge.pending { background: #fef3c7; color: #92400e; }
+        .mini-list-badge.used { background: #dcfce7; color: #166534; }
+
+        .empty-state {
+            text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 13px;
+        }
+
+        /* ===== 병원 목록 탭 ===== */
+        .tab-toolbar {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 20px; flex-wrap: wrap;
+        }
+
+        .tab-search {
+            flex: 1; min-width: 200px;
+            padding: 10px 14px 10px 36px;
+            border: 2px solid #e5e7eb; border-radius: 10px;
+            font-size: 13px; font-family: inherit;
+            transition: border-color 0.2s;
+            background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.442.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E") no-repeat 12px center;
+        }
+
+        .tab-search:focus { outline: none; border-color: #fbbf24; }
+
+        .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .filter-chip {
+            padding: 7px 16px; border-radius: 20px;
+            font-size: 12px; font-weight: 600;
+            cursor: pointer; border: 1.5px solid #e5e7eb;
+            background: white; color: #6b7280;
+            transition: all 0.2s;
+        }
+
+        .filter-chip:hover { border-color: #fbbf24; color: #b45309; }
+
+        .filter-chip.active {
+            background: #fef3c7; border-color: #fbbf24; color: #92400e;
+        }
+
+        .filter-chip .chip-count {
+            font-size: 10px; background: #e5e7eb; color: #6b7280;
+            padding: 1px 6px; border-radius: 8px; margin-left: 4px;
+        }
+
+        .filter-chip.active .chip-count {
+            background: #fbbf24; color: white;
+        }
+
+        /* ===== 테이블 공통 ===== */
+        .table-wrap {
+            border: 1px solid #e5e7eb; border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table-scroll {
+            max-height: 600px; overflow-y: auto;
+        }
+
+        .table-scroll::-webkit-scrollbar { width: 6px; }
+        .table-scroll::-webkit-scrollbar-track { background: #f9fafb; }
+        .table-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+
+        .data-table thead { position: sticky; top: 0; z-index: 5; }
+
+        .data-table th {
+            padding: 12px 16px;
+            background: #f9fafb; color: #374151;
+            font-size: 12px; font-weight: 600;
+            text-align: left;
+            border-bottom: 2px solid #e5e7eb;
+            white-space: nowrap;
+        }
+
+        .data-table td {
+            padding: 14px 16px;
+            font-size: 13px; color: #1f2937;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+        }
+
+        .data-table tr:hover { background: #fefce8; }
+        .data-table tr:last-child td { border-bottom: none; }
+
+        .hospital-name { font-weight: 600; color: #1f2937; }
+        .hospital-sub { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+
+        .status-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 10px; border-radius: 12px;
+            font-size: 11px; font-weight: 600; white-space: nowrap;
+        }
+
+        .status-badge.active { background: #dcfce7; color: #16a34a; }
+        .status-badge.pending { background: #fef3c7; color: #b45309; }
+        .status-badge.inactive { background: #fee2e2; color: #dc2626; }
+
+        .code-cell {
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 13px; font-weight: 700;
+            letter-spacing: 1.5px; color: #78350f;
+        }
+
+        .used-row .code-cell {
+            color: #166534; text-decoration: line-through; opacity: 0.7;
+        }
+
+        /* 행 액션 버튼 */
+        .row-actions { display: flex; gap: 6px; }
+
+        .row-btn {
+            padding: 6px 10px; border-radius: 6px;
+            font-size: 11px; font-weight: 600;
+            cursor: pointer; border: none;
+            transition: all 0.15s; white-space: nowrap;
+        }
+
+        .row-btn.view { background: #eff6ff; color: #2563eb; }
+        .row-btn.view:hover { background: #dbeafe; }
+        .row-btn.edit { background: #fef3c7; color: #92400e; }
+        .row-btn.edit:hover { background: #fde68a; }
+        .row-btn.copy { background: #f3f4f6; color: #374151; }
+        .row-btn.copy:hover { background: #e5e7eb; }
+        .row-btn.toggle { background: #fee2e2; color: #dc2626; }
+        .row-btn.toggle:hover { background: #fecaca; }
+        .row-btn.reactivate { background: #dcfce7; color: #16a34a; }
+        .row-btn.reactivate:hover { background: #bbf7d0; }
+        .row-btn.delete { background: #fee2e2; color: #dc2626; }
+        .row-btn.delete:hover { background: #fecaca; }
+
+        /* 테이블 빈 상태 */
+        .table-empty {
+            text-align: center; color: #9ca3af;
+            padding: 60px 20px; font-size: 14px;
+        }
+
+        .table-empty .empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+        /* 테이블 footer */
+        .table-footer {
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 12px; color: #6b7280;
+        }
+
+        /* ===== 최근 활동 ===== */
+        .activity-item {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 14px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .activity-item:last-child { border-bottom: none; }
+
+        .activity-icon {
+            width: 36px; height: 36px;
+            background: #f3f4f6; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; flex-shrink: 0;
+        }
+
+        .activity-content { flex: 1; }
+
+        .activity-text { font-size: 13px; color: #1f2937; }
+        .activity-text strong { font-weight: 600; color: #f59e0b; }
+        .activity-time { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+
+        /* ===== 병원 상세 패널 ===== */
+        .detail-panel {
+            display: none;
+            position: fixed;
+            top: 0; right: 0;
+            width: 420px; height: 100vh;
+            background: white;
+            box-shadow: -8px 0 30px rgba(0,0,0,0.1);
+            z-index: 200;
+            animation: slideIn 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .detail-panel.active { display: block; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        .detail-panel-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; background: white; z-index: 5;
+        }
+
+        .detail-panel-header h3 {
+            font-size: 16px; font-weight: 700; color: #1f2937;
+        }
+
+        .detail-close-btn {
+            background: #f3f4f6; border: none; width: 32px; height: 32px;
+            border-radius: 8px; cursor: pointer; font-size: 16px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .detail-close-btn:hover { background: #e5e7eb; }
+
+        .detail-panel-body { padding: 24px; }
+
+        .detail-field { margin-bottom: 16px; }
+        .detail-field label {
+            display: block; font-size: 11px; font-weight: 600;
+            color: #6b7280; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 4px;
+        }
+        .detail-field .value {
+            font-size: 14px; font-weight: 500; color: #1f2937;
+        }
+
+        .detail-divider {
+            height: 1px; background: #e5e7eb; margin: 20px 0;
+        }
+
+        .detail-section-title {
+            font-size: 13px; font-weight: 700; color: #1f2937;
+            margin-bottom: 12px;
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        .detail-user-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; background: #f9fafb;
+            border-radius: 8px; margin-bottom: 8px;
+        }
+
+        .detail-user-item .user-icon {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: #dbeafe; display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+        }
+
+        .detail-user-info { flex: 1; }
+        .detail-user-name { font-size: 13px; font-weight: 600; }
+        .detail-user-email { font-size: 11px; color: #6b7280; }
+
+        /* ===== 모달 ===== */
+        .modal-overlay {
+            display: none; position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center; align-items: center;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: white; border-radius: 16px;
+            padding: 32px; width: 90%; max-width: 480px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-title {
+            font-size: 18px; font-weight: 700; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .modal-field { margin-bottom: 16px; }
+
+        .modal-field label {
+            display: block; font-size: 13px; font-weight: 600;
+            color: #374151; margin-bottom: 6px;
+        }
+
+        .modal-field input, .modal-field select {
+            width: 100%; padding: 12px 14px;
+            border: 2px solid #e5e7eb; border-radius: 10px;
+            font-size: 14px; font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .modal-field input:focus, .modal-field select:focus {
+            outline: none; border-color: #f59e0b;
+        }
+
+        .modal-code-preview {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border: 2px solid #fbbf24;
+            border-radius: 12px; padding: 16px;
+            text-align: center; margin-bottom: 20px;
+        }
+
+        .modal-code-preview .code-text {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 24px; font-weight: 700;
+            color: #78350f; letter-spacing: 3px;
+        }
+
+        .modal-code-preview .code-hint {
+            font-size: 11px; color: #92400e; margin-top: 6px;
+        }
+
+        .modal-buttons { display: flex; gap: 10px; margin-top: 24px; }
+
+        .modal-buttons button {
+            flex: 1; padding: 12px; border-radius: 10px;
+            font-size: 14px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+        }
+
+        .btn-cancel { background: #f3f4f6; border: 1px solid #e5e7eb; color: #374151; }
+        .btn-cancel:hover { background: #e5e7eb; }
+        .btn-create { background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: white; }
+        .btn-create:hover { background: linear-gradient(135deg, #d97706, #b45309); }
+        .btn-create:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ===== 토스트 ===== */
+        .toast {
+            position: fixed; bottom: 30px; right: 30px;
+            padding: 14px 24px; border-radius: 12px;
+            font-size: 13px; font-weight: 600; z-index: 2000;
+            transform: translateY(100px); opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { background: #dcfce7; color: #166534; border: 1px solid #22c55e; }
+        .toast.error { background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+
+        /* ===== 반응형 ===== */
+        @media (max-width: 1200px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 60px; }
+            .logo-text, .logo-sub, .nav-label, .nav-badge, .nav-group-title, .user-info { display: none; }
+            .nav-item { justify-content: center; padding: 14px; }
+            .main-content { margin-left: 60px; }
+            .content-area { padding: 20px; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .detail-panel { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- 사이드바 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">👑</div>
+                    <div>
+                        <div class="logo-text">앞선케어</div>
+                        <div class="logo-sub">Admin Console</div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="nav-section">
+                <div class="nav-group-title">대시보드</div>
+                <a class="nav-item active" onclick="switchTab('overview')" data-tab="overview">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">전체 현황</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <div class="nav-group-title">병원 관리</div>
+                <a class="nav-item" onclick="switchTab('hospitals')" data-tab="hospitals">
+                    <span class="nav-icon">🏥</span>
+                    <span class="nav-label">병원 목록</span>
+                    <span class="nav-badge" id="hospitalCountBadge">-</span>
+                </a>
+                <a class="nav-item" onclick="switchTab('invites')" data-tab="invites">
+                    <span class="nav-icon">🎫</span>
+                    <span class="nav-label">초대코드</span>
+                    <span class="nav-badge alert" id="inviteCountBadge">-</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <div class="nav-group-title">콘텐츠 관리</div>
+                <a class="nav-item" href="apsencare_admin_data.html">
+                    <span class="nav-icon">📁</span>
+                    <span class="nav-label">자료 관리</span>
+                </a>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">📢</span>
+                    <span class="nav-label">공지사항</span>
+                </a>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">🎓</span>
+                    <span class="nav-label">교육 관리</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <div class="nav-group-title">시스템</div>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-label">전체 통계</span>
+                </a>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-label">설정</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar" id="userAvatar">-</div>
+                    <div class="user-info">
+                        <div class="user-name" id="userName">로딩 중...</div>
+                        <div class="user-role">Super Admin</div>
+                    </div>
+                    <button class="logout-btn" title="로그아웃" onclick="handleLogout()">🚪</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 메인 콘텐츠 -->
+        <main class="main-content">
+            <!-- ========== 탭1: 전체 현황 ========== -->
+            <div class="tab-page active" id="tab-overview">
+                <header class="top-header">
+                    <div class="page-title">
+                        <h1>전체 현황</h1>
+                        <p>앞선케어 플랫폼 요약 대시보드</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="loadDashboardData()">🔄 새로고침</button>
+                        <button class="btn btn-warning" onclick="openCreateModal()">➕ 새 병원 초대</button>
+                    </div>
+                </header>
+
+                <div class="content-area">
+                    <!-- 통계 카드 -->
+                    <div class="stats-grid">
+                        <div class="stat-card" onclick="switchTab('hospitals')">
+                            <div class="stat-header">
+                                <div class="stat-icon yellow">🏥</div>
+                            </div>
+                            <div class="stat-value" id="statHospitals">-</div>
+                            <div class="stat-label">등록 병원</div>
+                            <div class="stat-link">병원 목록 보기 →</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div class="stat-icon green">👤</div>
+                            </div>
+                            <div class="stat-value" id="statUsers">-</div>
+                            <div class="stat-label">전체 사용자</div>
+                        </div>
+                        <div class="stat-card" onclick="switchTab('invites')">
+                            <div class="stat-header">
+                                <div class="stat-icon blue">🎫</div>
+                            </div>
+                            <div class="stat-value" id="statPendingInvites">-</div>
+                            <div class="stat-label">대기 중 초대</div>
+                            <div class="stat-link">초대코드 관리 →</div>
+                        </div>
+                        <div class="stat-card" onclick="switchTab('invites')">
+                            <div class="stat-header">
+                                <div class="stat-icon pink">✅</div>
+                            </div>
+                            <div class="stat-value" id="statUsedInvites">-</div>
+                            <div class="stat-label">사용된 초대</div>
+                            <div class="stat-link">초대코드 관리 →</div>
+                        </div>
+                    </div>
+
+                    <!-- 간략 미니 리스트 -->
+                    <div class="grid-2">
+                        <!-- 최근 등록 병원 (간략) -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">🏥 최근 등록 병원</h3>
+                                <span class="card-link" onclick="switchTab('hospitals')">전체 보기 →</span>
+                            </div>
+                            <div id="overviewHospitalList">
+                                <div class="empty-state">로딩 중...</div>
+                            </div>
+                        </div>
+
+                        <!-- 최근 초대코드 (간략) -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">🎫 최근 초대코드</h3>
+                                <span class="card-link" onclick="switchTab('invites')">전체 보기 →</span>
+                            </div>
+                            <div id="overviewInviteList">
+                                <div class="empty-state">로딩 중...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 최근 가입 사용자 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">👤 최근 가입 사용자</h3>
+                        </div>
+                        <div id="recentUsersList">
+                            <div class="empty-state">로딩 중...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== 탭2: 병원 목록 ========== -->
+            <div class="tab-page" id="tab-hospitals">
+                <header class="top-header">
+                    <div class="page-title">
+                        <h1>병원 목록</h1>
+                        <p>등록된 병원 관리 및 상세 정보</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="exportHospitalData()">📥 내보내기</button>
+                        <button class="btn btn-warning" onclick="openCreateModal()">➕ 새 병원 초대</button>
+                    </div>
+                </header>
+
+                <div class="content-area">
+                    <!-- 검색 & 필터 -->
+                    <div class="tab-toolbar">
+                        <input type="text" class="tab-search" placeholder="병원명, 이메일 검색..." oninput="searchHospitals(this.value)" id="hospitalSearch">
+                        <div class="filter-chips">
+                            <button class="filter-chip active" onclick="filterHospitals('all')" id="hFilterAll">전체<span class="chip-count" id="hCountAll">0</span></button>
+                            <button class="filter-chip" onclick="filterHospitals('active')" id="hFilterActive">✅ 가입완료<span class="chip-count" id="hCountActive">0</span></button>
+                            <button class="filter-chip" onclick="filterHospitals('pending')" id="hFilterPending">⏳ 미가입<span class="chip-count" id="hCountPending">0</span></button>
+                        </div>
+                    </div>
+
+                    <!-- 병원 테이블 -->
+                    <div class="table-wrap">
+                        <div class="table-scroll">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>병원명</th>
+                                        <th>이메일 / 계정</th>
+                                        <th>예방과 도입시기</th>
+                                        <th>상태</th>
+                                        <th>등록일</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="hospitalTableBody">
+                                    <tr><td colspan="6" class="table-empty"><div class="empty-icon">🏥</div>로딩 중...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="table-footer">
+                            <span id="hospitalResultCount">0개 병원</span>
+                            <span id="hospitalResultInfo"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== 탭3: 초대코드 ========== -->
+            <div class="tab-page" id="tab-invites">
+                <header class="top-header">
+                    <div class="page-title">
+                        <h1>초대코드 관리</h1>
+                        <p>초대코드 생성, 상태 관리 및 추적</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="exportInviteData()">📥 내보내기</button>
+                        <button class="btn btn-warning" onclick="openCreateModal()">➕ 새 초대코드</button>
+                    </div>
+                </header>
+
+                <div class="content-area">
+                    <!-- 초대코드 요약 카드 -->
+                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 24px;">
+                        <div class="stat-card">
+                            <div class="stat-header"><div class="stat-icon blue">🎫</div></div>
+                            <div class="stat-value" id="invStatTotal">-</div>
+                            <div class="stat-label">전체 초대코드</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-header"><div class="stat-icon yellow">⏳</div></div>
+                            <div class="stat-value" id="invStatPending">-</div>
+                            <div class="stat-label">대기 중</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-header"><div class="stat-icon green">✅</div></div>
+                            <div class="stat-value" id="invStatUsed">-</div>
+                            <div class="stat-label">사용됨</div>
+                        </div>
+                    </div>
+
+                    <!-- 검색 & 필터 -->
+                    <div class="tab-toolbar">
+                        <input type="text" class="tab-search" placeholder="병원명, 코드, 사용자 검색..." oninput="searchInvites(this.value)" id="inviteSearch">
+                        <div class="filter-chips">
+                            <button class="filter-chip active" onclick="filterInvites('all')" id="filterAll">전체<span class="chip-count" id="countAll">0</span></button>
+                            <button class="filter-chip" onclick="filterInvites('pending')" id="filterPending">⏳ 대기 중<span class="chip-count" id="countPending">0</span></button>
+                            <button class="filter-chip" onclick="filterInvites('used')" id="filterUsed">✅ 사용됨<span class="chip-count" id="countUsed">0</span></button>
+                        </div>
+                    </div>
+
+                    <!-- 초대코드 테이블 -->
+                    <div class="table-wrap">
+                        <div class="table-scroll">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>병원</th>
+                                        <th>초대코드</th>
+                                        <th>상태</th>
+                                        <th>사용자</th>
+                                        <th>생성일</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inviteCodeList">
+                                    <tr><td colspan="6" class="table-empty"><div class="empty-icon">🎫</div>로딩 중...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="table-footer">
+                            <span id="inviteResultCount">0개 초대코드</span>
+                            <span id="inviteResultInfo"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 병원 상세 패널 -->
+    <div class="detail-panel" id="detailPanel">
+        <div class="detail-panel-header">
+            <h3 id="detailTitle">병원 상세</h3>
+            <button class="detail-close-btn" onclick="closeDetailPanel()">✕</button>
+        </div>
+        <div class="detail-panel-body" id="detailBody">
+        </div>
+    </div>
+
+    <!-- 초대코드 생성 모달 -->
+    <div class="modal-overlay" id="createModal">
+        <div class="modal">
+            <div class="modal-title">🎫 새 초대코드 생성</div>
+
+            <div class="modal-field">
+                <label>병원 ID *</label>
+                <input type="text" id="modalHospitalId" placeholder="예: hospital_002" oninput="validateForm()">
+            </div>
+
+            <div class="modal-field">
+                <label>병원 이름 *</label>
+                <input type="text" id="modalHospitalName" placeholder="예: 연세우일치과병원" oninput="validateForm()">
+            </div>
+
+            <div class="modal-field">
+                <label>주소 (선택)</label>
+                <input type="text" id="modalHospitalAddress" placeholder="예: 천안시 서북구">
+            </div>
+
+            <div class="modal-field">
+                <label>예방과 도입시기 (선택)</label>
+                <input type="month" id="modalPreventionStart">
+            </div>
+
+            <div class="modal-code-preview">
+                <div class="code-text" id="previewCode">----</div>
+                <div class="code-hint">초대코드가 자동으로 생성됩니다</div>
+                <button onclick="regenerateCode()" style="margin-top:8px;padding:6px 16px;border-radius:8px;border:1px solid #92400e;background:white;color:#92400e;font-size:11px;font-weight:600;cursor:pointer;">🔄 코드 재생성</button>
+            </div>
+
+            <div class="modal-field">
+                <label>코드 직접 입력 (선택)</label>
+                <input type="text" id="modalCustomCode" placeholder="비워두면 자동 생성" oninput="updatePreviewFromInput()" maxlength="12" style="text-transform:uppercase;letter-spacing:2px;font-weight:600;">
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="closeCreateModal()">취소</button>
+                <button class="btn-create" id="btnCreate" onclick="createInviteCode()" disabled>✨ 초대코드 생성</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 병원 정보 수정 모달 -->
+    <div class="modal-overlay" id="editHospitalModal">
+        <div class="modal">
+            <div class="modal-title">✏️ 병원 정보 수정</div>
+
+            <div class="modal-field">
+                <label>병원 ID</label>
+                <input type="text" id="editHospitalId" disabled style="background:#f3f4f6;">
+            </div>
+
+            <div class="modal-field">
+                <label>병원 이름</label>
+                <input type="text" id="editHospitalName">
+            </div>
+
+            <div class="modal-field">
+                <label>주소</label>
+                <input type="text" id="editHospitalAddress">
+            </div>
+
+            <div class="modal-field">
+                <label>예방과 도입시기</label>
+                <input type="month" id="editPreventionStart">
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="closeEditHospitalModal()">취소</button>
+                <button class="btn-create" onclick="saveHospitalEdit()">💾 저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ==================== Firebase 초기화 ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrU3rYs4fxlMkr8r0sjo70Mt0Al-HUtyg",
+            authDomain: "apseoncare-platform.firebaseapp.com",
+            projectId: "apseoncare-platform",
+            storageBucket: "apseoncare-platform.firebasestorage.app",
+            messagingSenderId: "515333523928",
+            appId: "1:515333523928:web:e19a9db63c522d8484caad"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        console.log('🔥 Firebase 초기화 완료! (관리자)');
+
+        // ==================== 전역 데이터 ====================
+        let _allHospitals = [];    // { id, name, address, createdAt, users: [] }
+        let _allInvites = [];      // { docId, code, hospitalId, hospitalName, isUsed, usedBy, usedAt, createdAt }
+        let _hospitalFilter = 'all';
+        let _hospitalSearch = '';
+        let _inviteFilter = 'all';
+        let _inviteSearch = '';
+
+        // ==================== 탭 전환 ====================
+        function switchTab(tabName) {
+            // 탭 페이지 전환
+            document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.add('active');
+
+            // 사이드바 active 전환
+            document.querySelectorAll('.nav-item[data-tab]').forEach(n => n.classList.remove('active'));
+            const navItem = document.querySelector('.nav-item[data-tab="' + tabName + '"]');
+            if (navItem) navItem.classList.add('active');
+
+            // 상세 패널 닫기
+            closeDetailPanel();
+        }
+
+        // ==================== 로그인 상태 체크 ====================
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                window.location.href = 'apsencare_login_firebase.html';
+                return;
+            }
+            console.log('로그인됨:', user.email);
+            await loadUserInfo(user.uid);
+            await loadDashboardData();
+        });
+
+        // ==================== 사용자 정보 로드 ====================
+        async function loadUserInfo(uid) {
+            try {
+                const userDoc = await db.collection('users').doc(uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    if (userData.userType !== 'admin') {
+                        alert('관리자 권한이 없습니다.');
+                        window.location.href = 'apsencare_hospital_home_firebase.html';
+                        return;
+                    }
+                    document.getElementById('userAvatar').textContent = userData.name ? userData.name.charAt(0) : '관';
+                    document.getElementById('userName').textContent = userData.name || userData.email;
+                }
+            } catch (error) {
+                console.error('사용자 정보 로드 오류:', error);
+            }
+        }
+
+        // ==================== 대시보드 데이터 로드 ====================
+        async function loadDashboardData() {
+            try {
+                // 1. 병원 데이터
+                const hospitalsSnap = await db.collection('hospitals').get();
+                const usersSnap = await db.collection('users').where('userType', '==', 'hospital').get();
+
+                // 사용자 매핑
+                const usersByHospital = {};
+                usersSnap.forEach(doc => {
+                    const u = doc.data();
+                    const hId = u.hospitalId || '';
+                    if (!usersByHospital[hId]) usersByHospital[hId] = [];
+                    usersByHospital[hId].push({
+                        uid: doc.id,
+                        email: u.email || '-',
+                        name: u.name || '',
+                        hospitalName: u.hospitalName || '',
+                        createdAt: u.createdAt ? u.createdAt.toDate() : null
+                    });
+                });
+
+                _allHospitals = [];
+                hospitalsSnap.forEach(doc => {
+                    const h = doc.data();
+                    _allHospitals.push({
+                        id: doc.id,
+                        name: h.name || doc.id,
+                        address: h.address || h.adress || '',
+                        preventionStart: h.preventionStart || '',
+                        createdAt: h.createdAt ? h.createdAt.toDate() : null,
+                        users: usersByHospital[doc.id] || []
+                    });
+                });
+
+                // 통계 업데이트
+                document.getElementById('statHospitals').textContent = _allHospitals.length;
+                document.getElementById('statUsers').textContent = usersSnap.size;
+                document.getElementById('hospitalCountBadge').textContent = _allHospitals.length;
+
+                // 2. 초대코드 데이터
+                const invitesSnap = await db.collection('inviteCodes').get();
+                _allInvites = [];
+                let pendingCount = 0, usedCount = 0;
+
+                invitesSnap.forEach(doc => {
+                    const inv = doc.data();
+                    const isUsed = inv.used === true;
+                    if (isUsed) usedCount++; else pendingCount++;
+                    _allInvites.push({
+                        docId: doc.id,
+                        code: inv.code || '-',
+                        hospitalId: inv.hospitalId || '',
+                        hospitalName: inv.hospitalName || inv.hospitalId || '-',
+                        isUsed,
+                        usedBy: inv.usedBy || '',
+                        usedAt: inv.usedAt && inv.usedAt.toDate ? inv.usedAt.toDate() : null,
+                        createdAt: inv.createdAt && inv.createdAt.toDate ? inv.createdAt.toDate() : null
+                    });
+                });
+
+                document.getElementById('statPendingInvites').textContent = pendingCount;
+                document.getElementById('statUsedInvites').textContent = usedCount;
+                document.getElementById('inviteCountBadge').textContent = pendingCount;
+
+                // 탭별 통계
+                document.getElementById('invStatTotal').textContent = _allInvites.length;
+                document.getElementById('invStatPending').textContent = pendingCount;
+                document.getElementById('invStatUsed').textContent = usedCount;
+
+                // 3. 전체현황 - 간략 미니 리스트 렌더
+                renderOverviewHospitals();
+                renderOverviewInvites();
+                renderRecentUsers(usersSnap);
+
+                // 4. 병원 목록 탭 렌더
+                updateHospitalCounts();
+                renderHospitalTable(getFilteredHospitals());
+
+                // 5. 초대코드 탭 렌더
+                updateInviteCounts();
+                renderInviteTable(getFilteredInvites());
+
+                console.log('✅ 대시보드 데이터 로드 완료');
+            } catch (error) {
+                console.error('대시보드 데이터 로드 오류:', error);
+            }
+        }
+
+        // ==================== 전체현황 - 간략 미니 리스트 ====================
+        function renderOverviewHospitals() {
+            const container = document.getElementById('overviewHospitalList');
+            const recent = [..._allHospitals].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5);
+
+            if (recent.length === 0) {
+                container.innerHTML = '<div class="empty-state">등록된 병원이 없습니다</div>';
+                return;
+            }
+
+            container.innerHTML = recent.map(h => {
+                const hasUser = h.users.length > 0;
+                const preventionText = h.preventionStart ? h.preventionStart.replace('-', '.') : '';
+                return `
+                    <div class="mini-list-item">
+                        <div class="mini-list-icon">${hasUser ? '🏥' : '🔒'}</div>
+                        <div class="mini-list-info">
+                            <div class="mini-list-name">${h.name}</div>
+                            <div class="mini-list-sub">${h.address || '주소 미등록'} · 사용자 ${h.users.length}명${preventionText ? ' · 예방과 ' + preventionText : ''}</div>
+                        </div>
+                        <span class="mini-list-badge ${hasUser ? 'active' : 'pending'}">${hasUser ? '가입완료' : '미가입'}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderOverviewInvites() {
+            const container = document.getElementById('overviewInviteList');
+            const recent = [..._allInvites].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5);
+
+            if (recent.length === 0) {
+                container.innerHTML = '<div class="empty-state">초대코드가 없습니다</div>';
+                return;
+            }
+
+            container.innerHTML = recent.map(inv => `
+                <div class="mini-list-item">
+                    <div class="mini-list-icon">${inv.isUsed ? '✅' : '⏳'}</div>
+                    <div class="mini-list-info">
+                        <div class="mini-list-name" style="font-family:monospace;letter-spacing:1px;">${inv.code}</div>
+                        <div class="mini-list-sub">${inv.hospitalName}</div>
+                    </div>
+                    <span class="mini-list-badge ${inv.isUsed ? 'used' : 'pending'}">${inv.isUsed ? '사용됨' : '대기 중'}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderRecentUsers(usersSnap) {
+            const container = document.getElementById('recentUsersList');
+            if (usersSnap.empty) {
+                container.innerHTML = '<div class="empty-state">가입된 병원 사용자가 없습니다</div>';
+                return;
+            }
+            container.innerHTML = '';
+            usersSnap.forEach(doc => {
+                const u = doc.data();
+                const createdAt = u.createdAt ? u.createdAt.toDate().toLocaleDateString('ko-KR') : '-';
+                const div = document.createElement('div');
+                div.className = 'activity-item';
+                div.innerHTML = `
+                    <div class="activity-icon">👤</div>
+                    <div class="activity-content">
+                        <div class="activity-text"><strong>${u.name || u.email}</strong> — ${u.hospitalName || '병원'}</div>
+                        <div class="activity-time">${u.email} · 가입일: ${createdAt}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // ==================== 병원 목록 탭 ====================
+        function updateHospitalCounts() {
+            const active = _allHospitals.filter(h => h.users.length > 0).length;
+            const pending = _allHospitals.filter(h => h.users.length === 0).length;
+            document.getElementById('hCountAll').textContent = _allHospitals.length;
+            document.getElementById('hCountActive').textContent = active;
+            document.getElementById('hCountPending').textContent = pending;
+        }
+
+        function getFilteredHospitals() {
+            let data = [..._allHospitals];
+            if (_hospitalFilter === 'active') data = data.filter(h => h.users.length > 0);
+            if (_hospitalFilter === 'pending') data = data.filter(h => h.users.length === 0);
+            if (_hospitalSearch) {
+                const q = _hospitalSearch.toLowerCase();
+                data = data.filter(h =>
+                    h.name.toLowerCase().includes(q) ||
+                    h.address.toLowerCase().includes(q) ||
+                    h.id.toLowerCase().includes(q) ||
+                    h.users.some(u => u.email.toLowerCase().includes(q) || u.name.toLowerCase().includes(q))
+                );
+            }
+            return data;
+        }
+
+        function filterHospitals(filter) {
+            _hospitalFilter = filter;
+            document.querySelectorAll('#tab-hospitals .filter-chip').forEach(c => c.classList.remove('active'));
+            document.getElementById('hFilter' + filter.charAt(0).toUpperCase() + filter.slice(1)).classList.add('active');
+            renderHospitalTable(getFilteredHospitals());
+        }
+
+        function searchHospitals(query) {
+            _hospitalSearch = query.trim();
+            renderHospitalTable(getFilteredHospitals());
+        }
+
+        function renderHospitalTable(data) {
+            const tbody = document.getElementById('hospitalTableBody');
+            document.getElementById('hospitalResultCount').textContent = data.length + '개 병원';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="table-empty"><div class="empty-icon">🏥</div>조건에 맞는 병원이 없습니다</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            data.forEach(h => {
+                const hasUser = h.users.length > 0;
+                const createdAt = h.createdAt ? h.createdAt.toLocaleDateString('ko-KR') : '-';
+                const emails = hasUser ? h.users.map(u => u.email).join(', ') : '미가입';
+                const preventionDisplay = h.preventionStart ? h.preventionStart.replace('-', '년 ') + '월' : '<span style="color:#9ca3af;">미등록</span>';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div class="hospital-name">${h.name}</div>
+                        <div class="hospital-sub">${h.address || ''} <span style="color:#d1d5db;">|</span> ID: ${h.id}</div>
+                    </td>
+                    <td style="font-size:12px;max-width:200px;">
+                        ${hasUser ? h.users.map(u => `<div>${u.email}</div>`).join('') : '<span style="color:#9ca3af;">—</span>'}
+                    </td>
+                    <td style="font-size:12px;font-weight:600;color:#7c3aed;">
+                        ${preventionDisplay}
+                    </td>
+                    <td>
+                        <span class="status-badge ${hasUser ? 'active' : 'pending'}">${hasUser ? '가입완료' : '미가입'}</span>
+                        ${hasUser ? '<div style="font-size:10px;color:#6b7280;margin-top:2px;">' + h.users.length + '명 계정</div>' : ''}
+                    </td>
+                    <td style="font-size:12px;color:#6b7280;">${createdAt}</td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="row-btn view" onclick="openHospitalDetail('${h.id}')">👁️ 상세</button>
+                            <button class="row-btn edit" onclick="openEditHospitalModal('${h.id}')">✏️</button>
+                            ${hasUser ? h.users.map(u => `<button class="row-btn edit" onclick="sendPasswordReset('${u.email}')" title="비밀번호 초기화">🔑</button>`).join('') : ''}
+                            <button class="row-btn delete" onclick="deleteHospital('${h.id}', '${h.name}')">🗑️</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 병원 상세 패널
+        function openHospitalDetail(hospitalId) {
+            const h = _allHospitals.find(x => x.id === hospitalId);
+            if (!h) return;
+
+            document.getElementById('detailTitle').textContent = h.name;
+
+            const invitesForHospital = _allInvites.filter(inv => inv.hospitalId === hospitalId);
+
+            let usersHtml = '';
+            if (h.users.length > 0) {
+                usersHtml = h.users.map(u => `
+                    <div class="detail-user-item">
+                        <div class="user-icon">👤</div>
+                        <div class="detail-user-info">
+                            <div class="detail-user-name">${u.name || '이름 미설정'}</div>
+                            <div class="detail-user-email">${u.email}</div>
+                        </div>
+                        <button class="row-btn edit" onclick="sendPasswordReset('${u.email}')" style="font-size:10px;">🔑 PW초기화</button>
+                    </div>
+                `).join('');
+            } else {
+                usersHtml = '<div style="color:#9ca3af;font-size:13px;padding:12px 0;">아직 가입한 사용자가 없습니다</div>';
+            }
+
+            let invitesHtml = '';
+            if (invitesForHospital.length > 0) {
+                invitesHtml = invitesForHospital.map(inv => `
+                    <div class="detail-user-item">
+                        <div class="user-icon" style="background:${inv.isUsed ? '#dcfce7' : '#fef3c7'};">${inv.isUsed ? '✅' : '⏳'}</div>
+                        <div class="detail-user-info">
+                            <div class="detail-user-name" style="font-family:monospace;letter-spacing:1px;">${inv.code}</div>
+                            <div class="detail-user-email">${inv.isUsed ? '사용됨' + (inv.usedBy ? ' · ' + inv.usedBy : '') : '대기 중'}</div>
+                        </div>
+                        <button class="row-btn copy" onclick="copyCode('${inv.code}')">📋</button>
+                    </div>
+                `).join('');
+            } else {
+                invitesHtml = '<div style="color:#9ca3af;font-size:13px;padding:12px 0;">발급된 초대코드가 없습니다</div>';
+            }
+
+            document.getElementById('detailBody').innerHTML = `
+                <div class="detail-field">
+                    <label>병원 ID</label>
+                    <div class="value" style="font-family:monospace;">${h.id}</div>
+                </div>
+                <div class="detail-field">
+                    <label>병원명</label>
+                    <div class="value">${h.name}</div>
+                </div>
+                <div class="detail-field">
+                    <label>주소</label>
+                    <div class="value">${h.address || '미등록'}</div>
+                </div>
+                <div class="detail-field">
+                    <label>예방과 도입시기</label>
+                    <div class="value" style="color:#7c3aed;font-weight:600;">${h.preventionStart ? h.preventionStart.replace('-', '년 ') + '월' : '미등록'}</div>
+                </div>
+                <div class="detail-field">
+                    <label>등록일</label>
+                    <div class="value">${h.createdAt ? h.createdAt.toLocaleDateString('ko-KR') : '-'}</div>
+                </div>
+
+                <div class="detail-divider"></div>
+
+                <div class="detail-section-title">👤 등록 사용자 (${h.users.length}명)</div>
+                ${usersHtml}
+
+                <div class="detail-divider"></div>
+
+                <div class="detail-section-title">🎫 초대코드 (${invitesForHospital.length}개)</div>
+                ${invitesHtml}
+
+                <div class="detail-divider"></div>
+
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-warning" style="flex:1;" onclick="openEditHospitalModal('${h.id}'); closeDetailPanel();">✏️ 정보 수정</button>
+                    <button class="btn btn-danger" style="flex:1;" onclick="deleteHospital('${h.id}', '${h.name}'); closeDetailPanel();">🗑️ 삭제</button>
+                </div>
+            `;
+
+            document.getElementById('detailPanel').classList.add('active');
+        }
+
+        function closeDetailPanel() {
+            document.getElementById('detailPanel').classList.remove('active');
+        }
+
+        // 병원 정보 수정
+        function openEditHospitalModal(hospitalId) {
+            const h = _allHospitals.find(x => x.id === hospitalId);
+            if (!h) return;
+            document.getElementById('editHospitalId').value = h.id;
+            document.getElementById('editHospitalName').value = h.name;
+            document.getElementById('editHospitalAddress').value = h.address;
+            document.getElementById('editPreventionStart').value = h.preventionStart || '';
+            document.getElementById('editHospitalModal').classList.add('active');
+        }
+
+        function closeEditHospitalModal() {
+            document.getElementById('editHospitalModal').classList.remove('active');
+        }
+
+        async function saveHospitalEdit() {
+            const id = document.getElementById('editHospitalId').value;
+            const name = document.getElementById('editHospitalName').value.trim();
+            const address = document.getElementById('editHospitalAddress').value.trim();
+            const preventionStart = document.getElementById('editPreventionStart').value;
+
+            if (!name) {
+                showToast('병원 이름을 입력해주세요.', 'error');
+                return;
+            }
+
+            try {
+                await db.collection('hospitals').doc(id).update({ name, address, preventionStart: preventionStart || '' });
+                showToast('병원 정보가 수정되었습니다.', 'success');
+                closeEditHospitalModal();
+                await loadDashboardData();
+            } catch (error) {
+                console.error('병원 수정 오류:', error);
+                showToast('수정 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // 병원 삭제
+        async function deleteHospital(hospitalId, hospitalName) {
+            if (!confirm('정말 "' + hospitalName + '" 병원을 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.\n(연결된 초대코드와 사용자 데이터는 유지됩니다)')) return;
+
+            try {
+                await db.collection('hospitals').doc(hospitalId).delete();
+                showToast('"' + hospitalName + '" 병원이 삭제되었습니다.', 'success');
+                await loadDashboardData();
+            } catch (error) {
+                console.error('병원 삭제 오류:', error);
+                showToast('삭제 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // 데이터 내보내기
+        function exportHospitalData() {
+            const data = getFilteredHospitals();
+            const csvRows = ['병원ID,병원명,주소,예방과도입시기,상태,이메일,등록일'];
+            data.forEach(h => {
+                const status = h.users.length > 0 ? '가입완료' : '미가입';
+                const emails = h.users.map(u => u.email).join('; ') || '-';
+                const date = h.createdAt ? h.createdAt.toLocaleDateString('ko-KR') : '-';
+                const prevention = h.preventionStart || '-';
+                csvRows.push(`${h.id},${h.name},${h.address},${prevention},${status},${emails},${date}`);
+            });
+
+            const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '앞선케어_병원목록_' + new Date().toISOString().slice(0, 10) + '.csv';
+            a.click();
+            showToast('병원 목록 CSV 다운로드!', 'success');
+        }
+
+        // ==================== 초대코드 탭 ====================
+        function updateInviteCounts() {
+            const pending = _allInvites.filter(i => !i.isUsed).length;
+            const used = _allInvites.filter(i => i.isUsed).length;
+            document.getElementById('countAll').textContent = _allInvites.length;
+            document.getElementById('countPending').textContent = pending;
+            document.getElementById('countUsed').textContent = used;
+        }
+
+        function getFilteredInvites() {
+            let data = [..._allInvites];
+            if (_inviteFilter === 'pending') data = data.filter(d => !d.isUsed);
+            if (_inviteFilter === 'used') data = data.filter(d => d.isUsed);
+            if (_inviteSearch) {
+                const q = _inviteSearch.toLowerCase();
+                data = data.filter(d =>
+                    d.hospitalName.toLowerCase().includes(q) ||
+                    d.code.toLowerCase().includes(q) ||
+                    (d.usedBy && d.usedBy.toLowerCase().includes(q))
+                );
+            }
+            return data;
+        }
+
+        function filterInvites(filter) {
+            _inviteFilter = filter;
+            document.querySelectorAll('#tab-invites .filter-chip').forEach(c => c.classList.remove('active'));
+            document.getElementById('filter' + filter.charAt(0).toUpperCase() + filter.slice(1)).classList.add('active');
+            renderInviteTable(getFilteredInvites());
+        }
+
+        function searchInvites(query) {
+            _inviteSearch = query.trim();
+            renderInviteTable(getFilteredInvites());
+        }
+
+        function renderInviteTable(data) {
+            const tbody = document.getElementById('inviteCodeList');
+            document.getElementById('inviteResultCount').textContent = data.length + '개 초대코드';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="table-empty"><div class="empty-icon">🎫</div>조건에 맞는 초대코드가 없습니다</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            data.forEach(inv => {
+                const tr = document.createElement('tr');
+                tr.className = inv.isUsed ? 'used-row' : '';
+                const createdDate = inv.createdAt ? inv.createdAt.toLocaleDateString('ko-KR') : '-';
+                const usedDate = inv.usedAt ? inv.usedAt.toLocaleDateString('ko-KR') : '';
+
+                tr.innerHTML = `
+                    <td>
+                        <div class="hospital-name">${inv.hospitalName}</div>
+                        <div class="hospital-sub">ID: ${inv.hospitalId}</div>
+                    </td>
+                    <td class="code-cell">${inv.code}</td>
+                    <td>
+                        <span class="status-badge ${inv.isUsed ? 'active' : 'pending'}">${inv.isUsed ? '✅ 사용됨' : '⏳ 대기 중'}</span>
+                        ${usedDate ? '<div style="font-size:10px;color:#6b7280;margin-top:2px;">' + usedDate + '</div>' : ''}
+                    </td>
+                    <td style="font-size:12px;">
+                        ${inv.usedBy ? inv.usedBy : '<span style="color:#9ca3af;">—</span>'}
+                    </td>
+                    <td style="font-size:12px;color:#6b7280;">${createdDate}</td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="row-btn copy" onclick="copyCode('${inv.code}')" title="복사">📋</button>
+                            ${inv.isUsed
+                                ? '<button class="row-btn reactivate" onclick="toggleInviteStatus(\'' + inv.docId + '\', false)" title="재활성화">🔄</button>'
+                                : '<button class="row-btn toggle" onclick="toggleInviteStatus(\'' + inv.docId + '\', true)" title="비활성화">⏸️</button>'
+                            }
+                            <button class="row-btn delete" onclick="deleteInviteCode('${inv.docId}', '${inv.code}')" title="삭제">🗑️</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportInviteData() {
+            const data = getFilteredInvites();
+            const csvRows = ['초대코드,병원명,병원ID,상태,사용자,생성일'];
+            data.forEach(inv => {
+                const status = inv.isUsed ? '사용됨' : '대기중';
+                const date = inv.createdAt ? inv.createdAt.toLocaleDateString('ko-KR') : '-';
+                csvRows.push(`${inv.code},${inv.hospitalName},${inv.hospitalId},${status},${inv.usedBy || '-'},${date}`);
+            });
+
+            const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '앞선케어_초대코드_' + new Date().toISOString().slice(0, 10) + '.csv';
+            a.click();
+            showToast('초대코드 CSV 다운로드!', 'success');
+        }
+
+        // ==================== 비밀번호 초기화 ====================
+        async function sendPasswordReset(email) {
+            if (!confirm('"' + email + '" 계정으로 비밀번호 초기화 메일을 보내시겠습니까?')) return;
+            try {
+                await auth.sendPasswordResetEmail(email);
+                showToast('📧 ' + email + '로 비밀번호 초기화 메일 발송!', 'success');
+            } catch (error) {
+                console.error('비밀번호 초기화 오류:', error);
+                if (error.code === 'auth/user-not-found') {
+                    showToast('해당 이메일로 등록된 계정이 없습니다.', 'error');
+                } else {
+                    showToast('메일 발송 중 오류: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // ==================== 초대코드 생성 모달 ====================
+        let generatedCode = '';
+
+        function generateCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+            code += '-';
+            for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+            return code;
+        }
+
+        function openCreateModal() {
+            generatedCode = generateCode();
+            document.getElementById('previewCode').textContent = generatedCode;
+            document.getElementById('modalHospitalId').value = '';
+            document.getElementById('modalHospitalName').value = '';
+            document.getElementById('modalHospitalAddress').value = '';
+            document.getElementById('modalPreventionStart').value = '';
+            document.getElementById('modalCustomCode').value = '';
+            document.getElementById('btnCreate').disabled = true;
+            document.getElementById('createModal').classList.add('active');
+        }
+
+        function closeCreateModal() {
+            document.getElementById('createModal').classList.remove('active');
+        }
+
+        function regenerateCode() {
+            generatedCode = generateCode();
+            document.getElementById('previewCode').textContent = generatedCode;
+            document.getElementById('modalCustomCode').value = '';
+        }
+
+        function updatePreviewFromInput() {
+            const custom = document.getElementById('modalCustomCode').value.trim().toUpperCase();
+            document.getElementById('previewCode').textContent = custom || generatedCode;
+        }
+
+        function validateForm() {
+            const id = document.getElementById('modalHospitalId').value.trim();
+            const name = document.getElementById('modalHospitalName').value.trim();
+            document.getElementById('btnCreate').disabled = !(id && name);
+        }
+
+        async function createInviteCode() {
+            const hospitalId = document.getElementById('modalHospitalId').value.trim();
+            const hospitalName = document.getElementById('modalHospitalName').value.trim();
+            const address = document.getElementById('modalHospitalAddress').value.trim();
+            const preventionStart = document.getElementById('modalPreventionStart').value;
+            const customCode = document.getElementById('modalCustomCode').value.trim().toUpperCase();
+            const finalCode = customCode || generatedCode;
+
+            if (!hospitalId || !hospitalName) {
+                showToast('병원 ID와 이름을 입력해주세요.', 'error');
+                return;
+            }
+
+            document.getElementById('btnCreate').disabled = true;
+            document.getElementById('btnCreate').textContent = '생성 중...';
+
+            try {
+                const existing = await db.collection('inviteCodes').where('code', '==', finalCode).get();
+                if (!existing.empty) {
+                    showToast('이미 존재하는 코드입니다.', 'error');
+                    document.getElementById('btnCreate').disabled = false;
+                    document.getElementById('btnCreate').textContent = '✨ 초대코드 생성';
+                    return;
+                }
+
+                const hospitalRef = db.collection('hospitals').doc(hospitalId);
+                const hospitalDoc = await hospitalRef.get();
+                if (!hospitalDoc.exists) {
+                    await hospitalRef.set({
+                        name: hospitalName,
+                        address: address || '',
+                        preventionStart: preventionStart || '',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+
+                await db.collection('inviteCodes').add({
+                    code: finalCode,
+                    hospitalId: hospitalId,
+                    hospitalName: hospitalName,
+                    used: false,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                closeCreateModal();
+                showToast('초대코드 "' + finalCode + '" 생성 완료!', 'success');
+                await loadDashboardData();
+            } catch (error) {
+                console.error('초대코드 생성 오류:', error);
+                showToast('초대코드 생성 중 오류가 발생했습니다.', 'error');
+            }
+
+            document.getElementById('btnCreate').disabled = false;
+            document.getElementById('btnCreate').textContent = '✨ 초대코드 생성';
+        }
+
+        // ==================== 초대코드 상태 토글 ====================
+        async function toggleInviteStatus(docId, setUsed) {
+            const action = setUsed ? '비활성화(사용됨 처리)' : '재활성화';
+            if (!confirm('이 초대코드를 ' + action + ' 하시겠습니까?')) return;
+
+            try {
+                const updateData = { used: setUsed };
+                if (!setUsed) {
+                    updateData.usedBy = firebase.firestore.FieldValue.delete();
+                    updateData.usedAt = firebase.firestore.FieldValue.delete();
+                }
+                await db.collection('inviteCodes').doc(docId).update(updateData);
+                showToast(action + ' 완료!', 'success');
+                await loadDashboardData();
+            } catch (error) {
+                console.error('상태 변경 오류:', error);
+                showToast('상태 변경 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // ==================== 초대코드 삭제 ====================
+        async function deleteInviteCode(docId, code) {
+            if (!confirm('초대코드 "' + code + '"을(를) 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+            try {
+                await db.collection('inviteCodes').doc(docId).delete();
+                showToast('초대코드 삭제 완료!', 'success');
+                await loadDashboardData();
+            } catch (error) {
+                console.error('삭제 오류:', error);
+                showToast('삭제 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // ==================== 초대코드 복사 ====================
+        function copyCode(code) {
+            navigator.clipboard.writeText(code).then(() => {
+                showToast('초대코드 복사됨: ' + code, 'success');
+            }).catch(() => {
+                prompt('초대코드를 복사하세요:', code);
+            });
+        }
+
+        // ==================== 토스트 ====================
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // ==================== 로그아웃 ====================
+        async function handleLogout() {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                await auth.signOut();
+                window.location.href = 'apsencare_login_firebase.html';
+            }
+        }
+    </script>
+</body>
+</html>

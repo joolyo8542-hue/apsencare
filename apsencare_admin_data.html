@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦷 앞선케어 - 자료 관리</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; background: #f9fafb; color: #1a1a1a; line-height: 1.6; font-size: 14px; }
+        .app-layout { display: flex; min-height: 100vh; }
+
+        /* 사이드바 (관리자 대시보드와 동일) */
+        .sidebar { width: 260px; background: #1f2937; display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #374151; }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #fbbf24, #f59e0b); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .logo-text { font-size: 18px; font-weight: 700; color: white; }
+        .logo-sub { font-size: 11px; color: #9ca3af; }
+        .nav-section { flex: 1; padding: 16px 12px; overflow-y: auto; }
+        .nav-group-title { font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; padding: 8px 12px 4px; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; color: #d1d5db; text-decoration: none; transition: all 0.2s; margin-bottom: 2px; font-size: 14px; }
+        .nav-item:hover { background: #374151; color: white; }
+        .nav-item.active { background: #f59e0b; color: #1f2937; font-weight: 600; }
+        .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+        .nav-badge { background: #374151; color: #d1d5db; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: auto; }
+        .nav-divider { height: 1px; background: #374151; margin: 8px 12px; }
+        .sidebar-footer { padding: 16px; border-top: 1px solid #374151; }
+        .user-card { display: flex; align-items: center; gap: 10px; }
+        .user-avatar { width: 36px; height: 36px; background: #f59e0b; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #1f2937; font-size: 14px; }
+        .user-info { flex: 1; }
+        .user-name { font-size: 13px; font-weight: 600; color: white; }
+        .user-role { font-size: 11px; color: #9ca3af; }
+        .logout-btn { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 18px; padding: 4px; border-radius: 6px; }
+        .logout-btn:hover { background: #374151; color: white; }
+
+        /* 메인 콘텐츠 */
+        .main-content { flex: 1; margin-left: 260px; }
+        .top-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 32px; background: white; border-bottom: 1px solid #e5e7eb; }
+        .page-title h1 { font-size: 22px; font-weight: 700; }
+        .page-title p { font-size: 13px; color: #6b7280; margin-top: 2px; }
+        .header-actions { display: flex; gap: 10px; }
+
+        .content-area { padding: 24px 32px; }
+
+        /* 버튼 */
+        .btn { padding: 10px 18px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #f59e0b; color: #1f2937; }
+        .btn-primary:hover { background: #d97706; }
+        .btn-secondary { background: #f3f4f6; color: #374151; }
+        .btn-secondary:hover { background: #e5e7eb; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+        /* 통계 요약 카드 */
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .summary-card { background: white; border-radius: 12px; padding: 20px; border: 1px solid #e5e7eb; }
+        .summary-card .label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+        .summary-card .value { font-size: 28px; font-weight: 700; color: #1f2937; }
+        .summary-card .sub { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+        .summary-card .icon { font-size: 24px; float: right; margin-top: -4px; }
+
+        /* 필터 바 */
+        .filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-bar input, .filter-bar select { padding: 9px 14px; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 13px; background: white; }
+        .filter-bar input:focus, .filter-bar select:focus { outline: none; border-color: #f59e0b; }
+
+        /* 카드 */
+        .card { background: white; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden; margin-bottom: 24px; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid #f3f4f6; }
+        .card-title { font-size: 16px; font-weight: 700; }
+        .card-body { padding: 0; }
+
+        /* 데이터 테이블 */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th { padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #6b7280; background: #f9fafb; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+        .data-table td { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+        .data-table tr:hover { background: #fffbeb; }
+        .data-table tr:last-child td { border-bottom: none; }
+
+        .hospital-name-cell { font-weight: 600; color: #1f2937; }
+        .hospital-id-cell { font-size: 11px; color: #9ca3af; }
+
+        /* KPI 뱃지 */
+        .kpi-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .kpi-badge.excellent { background: #d1fae5; color: #065f46; }
+        .kpi-badge.good { background: #fef3c7; color: #92400e; }
+        .kpi-badge.average { background: #fee2e2; color: #991b1b; }
+        .kpi-badge.none { background: #f3f4f6; color: #9ca3af; }
+
+        .trend-up { color: #10b981; font-weight: 600; }
+        .trend-down { color: #ef4444; font-weight: 600; }
+        .trend-neutral { color: #6b7280; }
+
+        /* 상세보기 모달 */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; opacity: 0; visibility: hidden; transition: all 0.3s; }
+        .modal-overlay.show { opacity: 1; visibility: visible; }
+        .modal { background: white; border-radius: 16px; width: 90%; max-width: 800px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #e5e7eb; }
+        .modal-header h3 { font-size: 18px; font-weight: 700; }
+        .modal-close { width: 36px; height: 36px; background: #f3f4f6; border: none; border-radius: 8px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: #e5e7eb; }
+        .modal-body { padding: 24px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 16px 24px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; justify-content: flex-end; }
+
+        /* 모달 내부 KPI 그리드 */
+        .detail-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+        .detail-kpi { background: #f9fafb; border-radius: 10px; padding: 16px; text-align: center; border: 1px solid #e5e7eb; }
+        .detail-kpi .val { font-size: 22px; font-weight: 700; color: #1f2937; }
+        .detail-kpi .lbl { font-size: 11px; color: #6b7280; margin-top: 4px; }
+
+        .detail-section-title { font-size: 14px; font-weight: 700; color: #374151; margin: 20px 0 10px 0; padding-bottom: 8px; border-bottom: 2px solid #f59e0b; }
+        .detail-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .detail-table th { padding: 10px 12px; background: #f9fafb; font-weight: 600; color: #6b7280; text-align: center; border: 1px solid #e5e7eb; }
+        .detail-table td { padding: 10px 12px; text-align: center; border: 1px solid #f3f4f6; }
+
+        /* 빈 상태 */
+        .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
+        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+        .empty-state .title { font-size: 18px; font-weight: 600; color: #6b7280; margin-bottom: 8px; }
+
+        /* 토스트 */
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 14px 28px; border-radius: 10px; font-size: 14px; font-weight: 500; z-index: 9999; opacity: 0; transition: all 0.3s; }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { background: #10b981; color: white; }
+        .toast.error { background: #ef4444; color: white; }
+
+        /* 로딩 */
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; opacity: 0; visibility: hidden; transition: all 0.3s; }
+        .loading-overlay.show { opacity: 1; visibility: visible; }
+        .loading-spinner { width: 48px; height: 48px; border: 4px solid #fef3c7; border-top-color: #f59e0b; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: #6b7280; font-size: 14px; }
+
+        /* 동의 상태 뱃지 */
+        .consent-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+        .consent-badge.yes { background: #d1fae5; color: #065f46; }
+        .consent-badge.no { background: #fee2e2; color: #991b1b; }
+
+        /* 반응형 */
+        @media (max-width: 1024px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+            .detail-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+            .summary-grid { grid-template-columns: 1fr; }
+            .top-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">로딩 중...</div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <div class="app-layout">
+        <!-- 사이드바 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">🦷</div>
+                    <div>
+                        <div class="logo-text">앞선케어</div>
+                        <div class="logo-sub">Admin Console</div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="nav-section">
+                <div class="nav-group-title">대시보드</div>
+                <a class="nav-item" href="apsencare_admin_firebase.html">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">전체 현황</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <div class="nav-group-title">병원 관리</div>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">🏥</span>
+                    <span class="nav-label">병원 목록</span>
+                </a>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">🎫</span>
+                    <span class="nav-label">초대코드</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <div class="nav-group-title">콘텐츠 관리</div>
+                <a class="nav-item active" href="apsencare_admin_data.html">
+                    <span class="nav-icon">📁</span>
+                    <span class="nav-label">자료 관리</span>
+                </a>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">📢</span>
+                    <span class="nav-label">공지사항</span>
+                </a>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">🎓</span>
+                    <span class="nav-label">교육 관리</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <div class="nav-group-title">시스템</div>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-label">전체 통계</span>
+                </a>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-label">설정</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar" id="userAvatar">-</div>
+                    <div class="user-info">
+                        <div class="user-name" id="userName">로딩 중...</div>
+                        <div class="user-role">Super Admin</div>
+                    </div>
+                    <button class="logout-btn" title="로그아웃" onclick="handleLogout()">🚪</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 메인 콘텐츠 -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="page-title">
+                    <h1>📁 자료 관리</h1>
+                    <p>병원별 분석 통계 데이터 조회 · 논문용 데이터 내보내기</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="loadAllStats()">🔄 새로고침</button>
+                    <button class="btn btn-success" onclick="exportAllCSV()">📥 전체 CSV 내보내기</button>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- 요약 카드 -->
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <span class="icon">🏥</span>
+                        <div class="label">분석 완료 병원</div>
+                        <div class="value" id="sumAnalyzed">-</div>
+                        <div class="sub">통계 데이터 보유</div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="icon">📊</span>
+                        <div class="label">평균 유지율</div>
+                        <div class="value" id="sumAvgRetention">-</div>
+                        <div class="sub">전체 병원 평균</div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="icon">💰</span>
+                        <div class="label">평균 YoY 성장률</div>
+                        <div class="value" id="sumAvgGrowth">-</div>
+                        <div class="sub">수납액 기준</div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="icon">✅</span>
+                        <div class="label">데이터 활용 동의</div>
+                        <div class="value" id="sumConsented">-</div>
+                        <div class="sub">연구 활용 가능</div>
+                    </div>
+                </div>
+
+                <!-- 필터 -->
+                <div class="filter-bar">
+                    <input type="text" id="searchInput" placeholder="🔍 병원명 검색..." oninput="filterTable()">
+                    <select id="filterType" onchange="filterTable()">
+                        <option value="all">전체 보기</option>
+                        <option value="hasGrowth">수납 분석 완료</option>
+                        <option value="hasRetention">유지율 분석 완료</option>
+                        <option value="hasBoth">둘 다 완료</option>
+                        <option value="consented">연구 동의 완료</option>
+                    </select>
+                </div>
+
+                <!-- 병원별 통계 테이블 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📋 병원별 분석 통계</h3>
+                        <span style="font-size: 12px; color: #6b7280;" id="tableCount">0개 병원</span>
+                    </div>
+                    <div class="card-body" style="overflow-x: auto;">
+                        <table class="data-table" id="statsTable">
+                            <thead>
+                                <tr>
+                                    <th>병원명</th>
+                                    <th style="text-align:center;">유지율</th>
+                                    <th style="text-align:center;">이탈율</th>
+                                    <th style="text-align:center;">YoY 성장률</th>
+                                    <th style="text-align:center;">최근 수납</th>
+                                    <th style="text-align:center;">객단가</th>
+                                    <th style="text-align:center;">비급여 비율</th>
+                                    <th style="text-align:center;">연구 동의</th>
+                                    <th style="text-align:center;">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="statsTableBody">
+                                <tr><td colspan="9" class="empty-state"><div class="icon">📊</div><div class="title">로딩 중...</div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 상세보기 모달 -->
+    <div class="modal-overlay" id="detailModal" onclick="closeDetailModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="detailModalTitle">병원 상세 통계</h3>
+                <button class="modal-close" onclick="closeDetailModal()">✕</button>
+            </div>
+            <div class="modal-body" id="detailModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDetailModal()">닫기</button>
+                <button class="btn btn-success" id="exportSingleBtn" onclick="exportSingleCSV()">📥 이 병원 CSV 내보내기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Firebase 초기화 ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrU3rYs4fxlMkr8r0sjo70Mt0Al-HUtyg",
+            authDomain: "apseoncare-platform.firebaseapp.com",
+            projectId: "apseoncare-platform",
+            storageBucket: "apseoncare-platform.firebasestorage.app",
+            messagingSenderId: "515333523928",
+            appId: "1:515333523928:web:e19a9db63c522d8484caad"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // 전역 변수
+        let allHospitalStats = [];
+        let currentDetailHospital = null;
+
+        // ==================== 인증 체크 ====================
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) { window.location.href = 'apsencare_login_firebase.html'; return; }
+            await loadUserInfo(user.uid);
+            await loadAllStats();
+        });
+
+        async function loadUserInfo(uid) {
+            try {
+                const userDoc = await db.collection('users').doc(uid).get();
+                if (userDoc.exists) {
+                    const d = userDoc.data();
+                    if (d.userType !== 'admin') {
+                        alert('관리자 권한이 없습니다.');
+                        window.location.href = 'apsencare_hospital_home_firebase.html';
+                        return;
+                    }
+                    document.getElementById('userAvatar').textContent = d.name ? d.name.charAt(0) : '관';
+                    document.getElementById('userName').textContent = d.name || d.email;
+                }
+            } catch (e) { console.error('사용자 정보 오류:', e); }
+        }
+
+        async function handleLogout() {
+            if (confirm('로그아웃 하시겠습니까?')) { await auth.signOut(); window.location.href = 'apsencare_login_firebase.html'; }
+        }
+
+        // ==================== 전체 통계 로드 ====================
+        async function loadAllStats() {
+            showLoading('병원 통계 데이터 로딩 중...');
+            try {
+                // 1. hospitalStats 컬렉션에서 각 병원의 최신 요약 로드
+                const statsSnap = await db.collection('hospitalStats').get();
+
+                // 2. users 컬렉션에서 동의 정보 로드
+                const usersSnap = await db.collection('users').where('userType', '==', 'hospital').get();
+                const consentMap = {};
+                usersSnap.forEach(doc => {
+                    const u = doc.data();
+                    if (u.hospitalId) {
+                        consentMap[u.hospitalId] = {
+                            dataResearchUsage: u.consent?.dataResearchUsage || false,
+                            consentDate: u.consent?.consentDate || null
+                        };
+                    }
+                });
+
+                allHospitalStats = [];
+                statsSnap.forEach(doc => {
+                    const d = doc.data();
+                    const hospitalId = doc.id;
+                    allHospitalStats.push({
+                        hospitalId,
+                        hospitalName: d.hospitalName || hospitalId,
+                        // 수납 성장률
+                        hasGrowth: !!d.lastGrowthAnalysis,
+                        growth: d.lastGrowthAnalysis || null,
+                        // 유지율/이탈율
+                        hasRetention: !!d.lastRetentionAnalysis,
+                        retention: d.lastRetentionAnalysis || null,
+                        // 동의 정보
+                        consent: consentMap[hospitalId] || { dataResearchUsage: false },
+                        // 최종 업데이트
+                        updatedAt: d.updatedAt
+                    });
+                });
+
+                renderStatsTable(allHospitalStats);
+                updateSummary(allHospitalStats);
+                hideLoading();
+                console.log(`✅ ${allHospitalStats.length}개 병원 통계 로드 완료`);
+            } catch (err) {
+                hideLoading();
+                console.error('❌ 통계 로드 오류:', err);
+                showToast('데이터 로드에 실패했습니다: ' + err.message, 'error');
+            }
+        }
+
+        // ==================== 요약 카드 업데이트 ====================
+        function updateSummary(data) {
+            document.getElementById('sumAnalyzed').textContent = data.length;
+
+            // 평균 유지율
+            const retentionVals = data.filter(d => d.hasRetention && d.retention.retentionRate !== '신규')
+                .map(d => parseFloat(d.retention.retentionRate));
+            if (retentionVals.length > 0) {
+                const avg = (retentionVals.reduce((a, b) => a + b, 0) / retentionVals.length).toFixed(1);
+                document.getElementById('sumAvgRetention').textContent = avg + '%';
+            } else {
+                document.getElementById('sumAvgRetention').textContent = '-';
+            }
+
+            // 평균 YoY 성장률
+            const growthVals = data.filter(d => d.hasGrowth && d.growth.yoyGrowth !== null)
+                .map(d => d.growth.yoyGrowth);
+            if (growthVals.length > 0) {
+                const avg = (growthVals.reduce((a, b) => a + b, 0) / growthVals.length).toFixed(1);
+                document.getElementById('sumAvgGrowth').textContent = (avg > 0 ? '+' : '') + avg + '%';
+            } else {
+                document.getElementById('sumAvgGrowth').textContent = '-';
+            }
+
+            // 연구 동의 수
+            const consented = data.filter(d => d.consent.dataResearchUsage).length;
+            document.getElementById('sumConsented').textContent = consented + '개';
+        }
+
+        // ==================== 테이블 렌더링 ====================
+        function renderStatsTable(data) {
+            const tbody = document.getElementById('statsTableBody');
+            document.getElementById('tableCount').textContent = data.length + '개 병원';
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="icon">📊</div><div class="title">분석 데이터가 없습니다</div><p>병원에서 분석을 실행하면 여기에 통계가 표시됩니다</p></div></td></tr>`;
+                return;
+            }
+
+            const fmtWon = v => { if (!v && v !== 0) return '-'; if (v >= 1e8) return (v/1e8).toFixed(1)+'억'; if (v >= 1e4) return (v/1e4).toFixed(0)+'만'; return v.toLocaleString(); };
+
+            tbody.innerHTML = data.map((h, idx) => {
+                // 유지율
+                let retHtml = '<span class="kpi-badge none">미분석</span>';
+                if (h.hasRetention) {
+                    const r = h.retention.retentionRate;
+                    if (r === '신규') retHtml = '<span class="kpi-badge good">신규</span>';
+                    else {
+                        const rv = parseFloat(r);
+                        const cls = rv >= 55 ? 'excellent' : rv >= 50 ? 'good' : 'average';
+                        retHtml = `<span class="kpi-badge ${cls}">${r}%</span>`;
+                    }
+                }
+
+                // 이탈율
+                let churnHtml = '-';
+                if (h.hasRetention && h.retention.churnRate !== null) {
+                    churnHtml = `<span style="color:#ef4444;font-weight:600;">${h.retention.churnRate}%</span>`;
+                }
+
+                // YoY 성장률
+                let growthHtml = '<span class="kpi-badge none">미분석</span>';
+                if (h.hasGrowth && h.growth.yoyGrowth !== null) {
+                    const g = h.growth.yoyGrowth;
+                    growthHtml = `<span class="${g >= 0 ? 'trend-up' : 'trend-down'}">${g > 0 ? '+' : ''}${g}%</span>`;
+                } else if (h.hasGrowth) {
+                    growthHtml = '<span class="trend-neutral">비교불가</span>';
+                }
+
+                // 최근 수납
+                const sunapHtml = h.hasGrowth ? fmtWon(h.growth.sunap) + '원' : '-';
+
+                // 객단가
+                const ppHtml = h.hasGrowth ? fmtWon(h.growth.perPatient) + '원' : '-';
+
+                // 비급여 비율
+                const nirHtml = h.hasGrowth ? h.growth.nonInsRatio + '%' : '-';
+
+                // 동의
+                const consentHtml = h.consent.dataResearchUsage
+                    ? '<span class="consent-badge yes">✅ 동의</span>'
+                    : '<span class="consent-badge no">❌ 미동의</span>';
+
+                return `<tr data-idx="${idx}">
+                    <td>
+                        <div class="hospital-name-cell">${h.hospitalName}</div>
+                        <div class="hospital-id-cell">${h.hospitalId}</div>
+                    </td>
+                    <td style="text-align:center;">${retHtml}</td>
+                    <td style="text-align:center;">${churnHtml}</td>
+                    <td style="text-align:center;">${growthHtml}</td>
+                    <td style="text-align:center;">${sunapHtml}</td>
+                    <td style="text-align:center;">${ppHtml}</td>
+                    <td style="text-align:center;">${nirHtml}</td>
+                    <td style="text-align:center;">${consentHtml}</td>
+                    <td style="text-align:center;">
+                        <button class="btn btn-sm btn-primary" onclick="openDetail('${h.hospitalId}')">상세보기</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        // ==================== 필터 ====================
+        function filterTable() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const type = document.getElementById('filterType').value;
+
+            const filtered = allHospitalStats.filter(h => {
+                // 검색어
+                if (query && !h.hospitalName.toLowerCase().includes(query) && !h.hospitalId.toLowerCase().includes(query)) return false;
+                // 필터
+                if (type === 'hasGrowth' && !h.hasGrowth) return false;
+                if (type === 'hasRetention' && !h.hasRetention) return false;
+                if (type === 'hasBoth' && (!h.hasGrowth || !h.hasRetention)) return false;
+                if (type === 'consented' && !h.consent.dataResearchUsage) return false;
+                return true;
+            });
+
+            renderStatsTable(filtered);
+        }
+
+        // ==================== 상세보기 모달 ====================
+        async function openDetail(hospitalId) {
+            currentDetailHospital = allHospitalStats.find(h => h.hospitalId === hospitalId);
+            if (!currentDetailHospital) return;
+
+            const h = currentDetailHospital;
+            document.getElementById('detailModalTitle').textContent = `📊 ${h.hospitalName} 상세 통계`;
+
+            showLoading('상세 데이터 로딩 중...');
+
+            try {
+                // 히스토리 로드
+                const growthSnap = await db.collection('hospitalStats').doc(hospitalId)
+                    .collection('growth').orderBy('analyzedAt', 'desc').limit(1).get();
+                const retentionSnap = await db.collection('hospitalStats').doc(hospitalId)
+                    .collection('retention').orderBy('analyzedAt', 'desc').limit(1).get();
+
+                let growthDetail = null, retentionDetail = null;
+                if (!growthSnap.empty) growthDetail = growthSnap.docs[0].data();
+                if (!retentionSnap.empty) retentionDetail = retentionSnap.docs[0].data();
+
+                hideLoading();
+                renderDetailModal(h, growthDetail, retentionDetail);
+                document.getElementById('detailModal').classList.add('show');
+            } catch (err) {
+                hideLoading();
+                console.error('상세 로드 오류:', err);
+                showToast('상세 데이터 로드 실패', 'error');
+            }
+        }
+
+        function renderDetailModal(h, growthDetail, retentionDetail) {
+            const fmtWon = v => { if (!v && v !== 0) return '-'; if (v >= 1e8) return (v/1e8).toFixed(2)+'억'; if (v >= 1e4) return (v/1e4).toFixed(0)+'만'; return v.toLocaleString(); };
+
+            let html = '';
+
+            // KPI 요약
+            html += '<div class="detail-kpi-grid">';
+            if (h.hasRetention) {
+                html += `<div class="detail-kpi"><div class="val" style="color:#ec4899;">${h.retention.retentionRate}${h.retention.retentionRate !== '신규' ? '%' : ''}</div><div class="lbl">유지율</div></div>`;
+                html += `<div class="detail-kpi"><div class="val" style="color:#ef4444;">${h.retention.churnRate !== null ? h.retention.churnRate + '%' : '-'}</div><div class="lbl">이탈율</div></div>`;
+                html += `<div class="detail-kpi"><div class="val">${h.retention.totalPatients?.toLocaleString() || '-'}</div><div class="lbl">총 환자수</div></div>`;
+            } else {
+                html += '<div class="detail-kpi"><div class="val" style="color:#9ca3af;">-</div><div class="lbl">유지율 (미분석)</div></div>';
+                html += '<div class="detail-kpi"><div class="val" style="color:#9ca3af;">-</div><div class="lbl">이탈율 (미분석)</div></div>';
+                html += '<div class="detail-kpi"><div class="val" style="color:#9ca3af;">-</div><div class="lbl">총 환자수 (미분석)</div></div>';
+            }
+            html += '</div>';
+
+            html += '<div class="detail-kpi-grid">';
+            if (h.hasGrowth) {
+                const g = h.growth;
+                html += `<div class="detail-kpi"><div class="val">${fmtWon(g.sunap)}원</div><div class="lbl">최근 수납</div></div>`;
+                html += `<div class="detail-kpi"><div class="val" style="color:${g.yoyGrowth >= 0 ? '#10b981' : '#ef4444'};">${g.yoyGrowth !== null ? (g.yoyGrowth > 0 ? '+' : '') + g.yoyGrowth + '%' : '-'}</div><div class="lbl">YoY 성장률</div></div>`;
+                html += `<div class="detail-kpi"><div class="val">${fmtWon(g.perPatient)}원</div><div class="lbl">객단가</div></div>`;
+            } else {
+                html += '<div class="detail-kpi"><div class="val" style="color:#9ca3af;">-</div><div class="lbl">수납 (미분석)</div></div>';
+                html += '<div class="detail-kpi"><div class="val" style="color:#9ca3af;">-</div><div class="lbl">성장률 (미분석)</div></div>';
+                html += '<div class="detail-kpi"><div class="val" style="color:#9ca3af;">-</div><div class="lbl">객단가 (미분석)</div></div>';
+            }
+            html += '</div>';
+
+            // 유지율 상세 테이블
+            if (retentionDetail && retentionDetail.yearlySummary) {
+                html += `<div class="detail-section-title">👥 유지율 / 이탈율 상세 (${retentionDetail.periodStart} ~ ${retentionDetail.periodEnd})</div>`;
+                html += '<table class="detail-table"><thead><tr><th>연도</th><th>이월 환자</th><th>신규 환자</th><th>이탈 환자</th><th>총 환자수</th><th>유지율</th></tr></thead><tbody>';
+                retentionDetail.yearlySummary.forEach(y => {
+                    html += `<tr>
+                        <td style="font-weight:600;">${y.year}년</td>
+                        <td>${y.retainedFromPrevious.toLocaleString()}명</td>
+                        <td style="color:#10b981;">${y.newPatients.toLocaleString()}명</td>
+                        <td style="color:#ef4444;">${y.churned.toLocaleString()}명</td>
+                        <td style="font-weight:600;">${y.totalPatients.toLocaleString()}명</td>
+                        <td style="font-weight:600;color:#ec4899;">${y.retentionRate}${y.retentionRate !== '신규' ? '%' : ''}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            }
+
+            // 수납 성장률 상세 테이블 (최근 12개월만)
+            if (growthDetail && growthDetail.monthlySummary) {
+                const recent = growthDetail.monthlySummary.slice(-12);
+                html += `<div class="detail-section-title">💰 수납 성장률 상세 (최근 ${recent.length}개월)</div>`;
+                html += '<table class="detail-table"><thead><tr><th>월</th><th>수납합계</th><th>내원건수</th><th>객단가</th><th>비급여비율</th></tr></thead><tbody>';
+                recent.forEach(m => {
+                    html += `<tr>
+                        <td style="font-weight:600;">${m.label}</td>
+                        <td>${fmtWon(m.sunap)}원</td>
+                        <td>${m.patients.toLocaleString()}건</td>
+                        <td>${fmtWon(m.perPatient)}원</td>
+                        <td>${m.nonInsRatio.toFixed(1)}%</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            }
+
+            // 동의 정보
+            html += '<div class="detail-section-title">📋 데이터 활용 동의 정보</div>';
+            html += `<p style="font-size:13px;color:#374151;">연구 활용 동의: ${h.consent.dataResearchUsage ? '<strong style="color:#10b981;">✅ 동의함</strong>' : '<strong style="color:#ef4444;">❌ 미동의</strong>'}</p>`;
+            if (h.consent.consentDate) {
+                html += `<p style="font-size:12px;color:#6b7280;margin-top:4px;">동의 일시: ${new Date(h.consent.consentDate).toLocaleDateString('ko-KR')}</p>`;
+            }
+
+            document.getElementById('detailModalBody').innerHTML = html;
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.remove('show');
+            currentDetailHospital = null;
+        }
+
+        // ==================== CSV 내보내기 (논문용) ====================
+        function exportAllCSV() {
+            // 연구 동의한 병원만 내보내기
+            const consented = allHospitalStats.filter(h => h.consent.dataResearchUsage);
+            if (consented.length === 0) {
+                showToast('연구 활용에 동의한 병원이 없습니다.', 'error');
+                return;
+            }
+
+            // 병원명 익명화 (A병원, B병원, ...)
+            const anonymize = (idx) => String.fromCharCode(65 + idx) + '병원';
+
+            let csv = 'BOM\n';  // UTF-8 BOM
+            csv = '\uFEFF';
+
+            // 요약 테이블
+            csv += '=== 병원별 분석 요약 (익명화) ===\n';
+            csv += '식별코드,유지율(%),이탈율(%),YoY성장률(%),최근수납(원),객단가(원),비급여비율(%)\n';
+            consented.forEach((h, i) => {
+                const ret = h.hasRetention ? h.retention.retentionRate : '';
+                const churn = h.hasRetention && h.retention.churnRate !== null ? h.retention.churnRate : '';
+                const yoy = h.hasGrowth && h.growth.yoyGrowth !== null ? h.growth.yoyGrowth : '';
+                const sunap = h.hasGrowth ? h.growth.sunap : '';
+                const pp = h.hasGrowth ? h.growth.perPatient : '';
+                const nir = h.hasGrowth ? h.growth.nonInsRatio : '';
+                csv += `${anonymize(i)},${ret},${churn},${yoy},${sunap},${pp},${nir}\n`;
+            });
+
+            csv += '\n=== 메타데이터 ===\n';
+            csv += `내보내기 일시,${new Date().toISOString()}\n`;
+            csv += `대상 병원 수,${consented.length}\n`;
+            csv += `데이터 유형,개인식별 불가능한 집계 통계\n`;
+            csv += `병원명 처리,익명화 (A병원 B병원 등)\n`;
+            csv += `활용 범위,학술 연구 및 비영리 목적\n`;
+
+            downloadCSV(csv, `apsencare_research_data_${new Date().toISOString().slice(0,10)}.csv`);
+            showToast(`✅ ${consented.length}개 병원 데이터 내보내기 완료 (익명화)`, 'success');
+        }
+
+        async function exportSingleCSV() {
+            if (!currentDetailHospital) return;
+            const h = currentDetailHospital;
+
+            if (!h.consent.dataResearchUsage) {
+                showToast('이 병원은 연구 활용에 동의하지 않았습니다.', 'error');
+                return;
+            }
+
+            // 상세 데이터 로드
+            showLoading('데이터 준비 중...');
+            try {
+                const growthSnap = await db.collection('hospitalStats').doc(h.hospitalId)
+                    .collection('growth').orderBy('analyzedAt', 'desc').limit(1).get();
+                const retentionSnap = await db.collection('hospitalStats').doc(h.hospitalId)
+                    .collection('retention').orderBy('analyzedAt', 'desc').limit(1).get();
+
+                let csv = '\uFEFF';
+                const anonName = '익명병원';
+
+                // 유지율 데이터
+                if (!retentionSnap.empty) {
+                    const rd = retentionSnap.docs[0].data();
+                    csv += `=== ${anonName} 유지율/이탈율 (${rd.periodStart}~${rd.periodEnd}) ===\n`;
+                    csv += '연도,이월환자(명),신규환자(명),이탈환자(명),총환자수(명),유지율(%)\n';
+                    if (rd.yearlySummary) {
+                        rd.yearlySummary.forEach(y => {
+                            csv += `${y.year},${y.retainedFromPrevious},${y.newPatients},${y.churned},${y.totalPatients},${y.retentionRate}\n`;
+                        });
+                    }
+                    csv += '\n';
+                }
+
+                // 수납 성장률 데이터
+                if (!growthSnap.empty) {
+                    const gd = growthSnap.docs[0].data();
+                    csv += `=== ${anonName} 수납 성장률 (${gd.periodStart}~${gd.periodEnd}) ===\n`;
+                    csv += '연월,수납합계(원),내원건수,객단가(원),비급여비율(%),본인부담금(원),공단부담금(원),비급여(원),총진료비(원)\n';
+                    if (gd.monthlySummary) {
+                        gd.monthlySummary.forEach(m => {
+                            csv += `${m.label},${m.sunap},${m.patients},${m.perPatient},${m.nonInsRatio},${m.copay},${m.nhis},${m.nonIns},${m.totalFee}\n`;
+                        });
+                    }
+                }
+
+                csv += `\n=== 메타데이터 ===\n`;
+                csv += `내보내기 일시,${new Date().toISOString()}\n`;
+                csv += `병원명 처리,익명화\n`;
+
+                hideLoading();
+                downloadCSV(csv, `apsencare_hospital_data_${new Date().toISOString().slice(0,10)}.csv`);
+                showToast('✅ CSV 내보내기 완료 (익명화)', 'success');
+            } catch (err) {
+                hideLoading();
+                showToast('내보내기 실패: ' + err.message, 'error');
+            }
+        }
+
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        // ==================== 유틸리티 ====================
+        function showLoading(text) { document.getElementById('loadingText').textContent = text; document.getElementById('loadingOverlay').classList.add('show'); }
+        function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
+        function showToast(msg, type) { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast ' + type + ' show'; setTimeout(() => t.classList.remove('show'), 3500); }
+    </script>
+</body>
+</html>

@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>앞선케어 - 회원가입</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK (compat 버전 - 안정적인 9.x) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', 'Noto Sans KR', sans-serif; background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
+
+        .signup-container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 480px;
+            padding: 48px;
+        }
+
+        .signup-header { text-align: center; margin-bottom: 32px; }
+        .logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 24px; }
+        .logo-circle { width: 56px; height: 56px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; border: 3px solid #ec4899; }
+        .logo-text-group { text-align: left; }
+        .logo-main { font-family: 'Noto Sans KR', sans-serif; font-size: 24px; font-weight: 700; color: #1f2937; }
+        .logo-sub { font-size: 11px; color: #ec4899; font-weight: 600; text-transform: uppercase; }
+
+        .signup-title { font-size: 24px; font-weight: 700; color: #1f2937; margin-bottom: 8px; }
+        .signup-desc { font-size: 14px; color: #6b7280; }
+
+        /* 초대코드 배지 */
+        .invite-badge {
+            background: linear-gradient(135deg, #fdf2f8, #fce7f3);
+            border: 2px solid #fbcfe8;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .invite-badge-label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+        .invite-badge-code { font-size: 20px; font-weight: 700; color: #ec4899; letter-spacing: 3px; }
+        .invite-badge-hospital { font-size: 13px; color: #374151; margin-top: 8px; }
+
+        /* 폼 */
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+        .form-label .required { color: #ef4444; }
+        .input-wrapper { position: relative; }
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1.5px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: #f9fafb;
+        }
+        .form-input:focus { outline: none; border-color: #ec4899; background: white; box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1); }
+        .form-input.error { border-color: #ef4444; }
+        .form-input.success { border-color: #10b981; }
+        .form-hint { font-size: 11px; color: #6b7280; margin-top: 6px; }
+        .form-hint.error { color: #ef4444; }
+        .form-hint.success { color: #10b981; }
+
+        .password-toggle { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; }
+
+        /* 비밀번호 강도 */
+        .password-strength { margin-top: 8px; }
+        .strength-bar { height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden; }
+        .strength-fill { height: 100%; transition: all 0.3s; width: 0%; }
+        .strength-fill.weak { width: 33%; background: #ef4444; }
+        .strength-fill.medium { width: 66%; background: #f59e0b; }
+        .strength-fill.strong { width: 100%; background: #10b981; }
+        .strength-text { font-size: 11px; margin-top: 4px; }
+
+        /* 약관 */
+        .terms-section { margin: 24px 0; }
+        .terms-check { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+        .terms-check input { margin-top: 2px; accent-color: #ec4899; width: 18px; height: 18px; }
+        .terms-check label { font-size: 13px; color: #374151; line-height: 1.5; }
+        .terms-check a { color: #ec4899; text-decoration: none; }
+        .terms-check a:hover { text-decoration: underline; }
+
+        /* 버튼 */
+        .signup-button {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #f472b6, #ec4899);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .signup-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(236, 72, 153, 0.3); }
+        .signup-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .login-link { text-align: center; margin-top: 24px; font-size: 14px; color: #6b7280; }
+        .login-link a { color: #ec4899; text-decoration: none; font-weight: 600; }
+
+        /* 에러 메시지 */
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .error-message.show { display: block; }
+
+        /* 로딩 & 토스트 */
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; opacity: 0; visibility: hidden; transition: all 0.3s; }
+        .loading-overlay.show { opacity: 1; visibility: visible; }
+        .loading-spinner { width: 48px; height: 48px; border: 4px solid #fce7f3; border-top-color: #ec4899; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: #6b7280; font-size: 14px; }
+
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 14px 28px; border-radius: 10px; font-size: 14px; font-weight: 500; z-index: 9999; opacity: 0; transition: all 0.3s ease; }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { background: #10b981; color: white; }
+        .toast.error { background: #ef4444; color: white; }
+
+        /* 반응형 */
+        @media (max-width: 520px) {
+            .signup-container { padding: 32px 24px; }
+            .terms-modal { margin: 20px; max-height: 90vh; }
+        }
+
+        /* 약관 구분선 */
+        .terms-divider { height: 1px; background: #e5e7eb; margin: 8px 0 12px 0; }
+        .terms-all-wrap label { font-size: 14px; }
+
+        /* 데이터 활용 동의 하이라이트 */
+        .data-consent-check { 
+            background: linear-gradient(135deg, #fdf2f8, #fef3c7);
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1.5px solid #fbcfe8;
+            margin-top: 4px;
+        }
+        .data-consent-check label { font-weight: 500; }
+        .data-consent-summary {
+            font-size: 11.5px;
+            color: #6b7280;
+            background: #f9fafb;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-top: 6px;
+            line-height: 1.6;
+        }
+        .data-consent-summary a { color: #ec4899; text-decoration: none; font-weight: 500; }
+        .data-consent-summary a:hover { text-decoration: underline; }
+
+        /* 약관 모달 */
+        .terms-modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 10000;
+            opacity: 0; visibility: hidden;
+            transition: all 0.3s;
+        }
+        .terms-modal-overlay.show { opacity: 1; visibility: visible; }
+        .terms-modal {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 520px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            transform: translateY(30px);
+            transition: transform 0.3s;
+        }
+        .terms-modal-overlay.show .terms-modal { transform: translateY(0); }
+        .terms-modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .terms-modal-header h3 { font-size: 17px; font-weight: 700; color: #1f2937; }
+        .terms-modal-close {
+            width: 32px; height: 32px;
+            background: #f3f4f6; border: none; border-radius: 8px;
+            font-size: 16px; cursor: pointer; color: #6b7280;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .terms-modal-close:hover { background: #e5e7eb; }
+        .terms-modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            font-size: 13px;
+            color: #374151;
+            line-height: 1.8;
+            flex: 1;
+        }
+        .terms-modal-body h4 { font-size: 14px; font-weight: 700; color: #1f2937; margin: 16px 0 8px 0; }
+        .terms-modal-body h4:first-child { margin-top: 0; }
+        .terms-modal-body .highlight-box {
+            background: #fdf2f8;
+            border: 1px solid #fbcfe8;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin: 12px 0;
+        }
+        .terms-modal-body .highlight-box li {
+            margin-bottom: 6px;
+            padding-left: 4px;
+        }
+        .terms-modal-body ul { padding-left: 20px; }
+        .terms-modal-body li { margin-bottom: 4px; }
+        .terms-modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .terms-modal-agree {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #f472b6, #ec4899);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .terms-modal-agree:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(236,72,153,0.3); }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">처리 중...</div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <div class="signup-container">
+        <div class="signup-header">
+            <div class="logo">
+                <div class="logo-circle">🦷</div>
+                <div class="logo-text-group">
+                    <div class="logo-main">앞선케어</div>
+                    <div class="logo-sub">Advanced Care Platform</div>
+                </div>
+            </div>
+            <h1 class="signup-title">회원가입 ✨</h1>
+            <p class="signup-desc">앞선케어 파트너로 함께해주세요</p>
+        </div>
+
+        <!-- 초대코드 배지 -->
+        <div class="invite-badge" id="inviteBadge">
+            <div class="invite-badge-label">초대코드</div>
+            <div class="invite-badge-code" id="displayCode">-</div>
+            <div class="invite-badge-hospital" id="displayHospital"></div>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <form id="signupForm">
+            <div class="form-group">
+                <label class="form-label">병원이름 <span class="required">*</span></label>
+                <input type="text" class="form-input" id="nameInput" placeholder="OO치과의원" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">이메일 <span class="required">*</span></label>
+                <input type="email" class="form-input" id="emailInput" placeholder="example@hospital.com" required>
+                <div class="form-hint" id="emailHint"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">비밀번호 <span class="required">*</span></label>
+                <div class="input-wrapper">
+                    <input type="password" class="form-input" id="passwordInput" placeholder="8자 이상, 영문+숫자 조합" required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('passwordInput')">👁️</button>
+                </div>
+                <div class="password-strength">
+                    <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+                    <div class="strength-text" id="strengthText"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">비밀번호 확인 <span class="required">*</span></label>
+                <div class="input-wrapper">
+                    <input type="password" class="form-input" id="passwordConfirmInput" placeholder="비밀번호를 다시 입력하세요" required>
+                    <button type="button" class="password-toggle" onclick="togglePassword('passwordConfirmInput')">👁️</button>
+                </div>
+                <div class="form-hint" id="confirmHint"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">전화번호</label>
+                <input type="tel" class="form-input" id="phoneInput" placeholder="010-0000-0000">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">예방과 도입시기 <span class="required">*</span></label>
+                <input type="month" class="form-input" id="preventionStartInput" required style="color:#374151;">
+                <div class="form-hint">예방과를 도입한 연도와 월을 선택해주세요</div>
+            </div>
+
+            <div class="terms-section">
+                <div class="terms-check terms-all-wrap">
+                    <input type="checkbox" id="termsAll" onchange="toggleAllTerms()">
+                    <label for="termsAll"><strong>전체 동의</strong></label>
+                </div>
+                <div class="terms-divider"></div>
+                <div class="terms-check">
+                    <input type="checkbox" id="terms1" class="term-item" required>
+                    <label for="terms1">[필수] <a href="#" onclick="openTermsModal('service'); return false;">이용약관</a>에 동의합니다</label>
+                </div>
+                <div class="terms-check">
+                    <input type="checkbox" id="terms2" class="term-item" required>
+                    <label for="terms2">[필수] <a href="#" onclick="openTermsModal('privacy'); return false;">개인정보처리방침</a>에 동의합니다</label>
+                </div>
+                <div class="terms-check data-consent-check">
+                    <input type="checkbox" id="terms3" class="term-item" required>
+                    <label for="terms3">[필수] <a href="#" onclick="openTermsModal('data'); return false;">통계 데이터 학술연구 활용</a>에 동의합니다</label>
+                </div>
+                <div class="data-consent-summary">
+                    📊 업로드된 자료에서 개인식별이 불가능한 통계 결과값(유지율, 이탈율 등)만 수집되며, 학술 연구 및 비영리 목적으로만 활용됩니다. <a href="#" onclick="openTermsModal('data'); return false;">자세히 보기 →</a>
+                </div>
+            </div>
+
+            <!-- 약관 상세보기 모달 -->
+            <div class="terms-modal-overlay" id="termsModalOverlay" onclick="closeTermsModal()">
+                <div class="terms-modal" onclick="event.stopPropagation()">
+                    <div class="terms-modal-header">
+                        <h3 id="termsModalTitle">약관</h3>
+                        <button class="terms-modal-close" onclick="closeTermsModal()">✕</button>
+                    </div>
+                    <div class="terms-modal-body" id="termsModalBody"></div>
+                    <div class="terms-modal-footer">
+                        <button class="terms-modal-agree" id="termsModalAgreeBtn" onclick="agreeAndClose()">동의하기</button>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="signup-button" id="signupBtn">가입하기</button>
+        </form>
+
+        <p class="login-link">
+            이미 계정이 있으신가요? <a href="apsencare_login_firebase.html">로그인</a>
+        </p>
+    </div>
+
+    <script>
+        // ==================== Firebase 초기화 ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrU3rYs4fxlMkr8r0sjo70Mt0Al-HUtyg",
+            authDomain: "apseoncare-platform.firebaseapp.com",
+            projectId: "apseoncare-platform",
+            storageBucket: "apseoncare-platform.firebasestorage.app",
+            messagingSenderId: "515333523928",
+            appId: "1:515333523928:web:e19a9db63c522d8484caad"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        console.log('🔥 Firebase 초기화 완료!');
+
+        // ==================== 초대코드 정보 로드 ====================
+        let inviteData = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const inviteStr = sessionStorage.getItem('apsencare_invite');
+            
+            if (!inviteStr) {
+                showToast('초대코드가 필요합니다. 로그인 페이지에서 초대코드를 입력해주세요.', 'error');
+                setTimeout(() => {
+                    window.location.href = 'apsencare_login_firebase.html';
+                }, 2000);
+                return;
+            }
+
+            inviteData = JSON.parse(inviteStr);
+            document.getElementById('displayCode').textContent = inviteData.code;
+            
+            if (inviteData.hospitalName) {
+                document.getElementById('displayHospital').textContent = '🏥 ' + inviteData.hospitalName;
+            }
+        });
+
+        // ==================== 회원가입 처리 ====================
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const name = document.getElementById('nameInput').value.trim();
+            const email = document.getElementById('emailInput').value.trim();
+            const password = document.getElementById('passwordInput').value;
+            const passwordConfirm = document.getElementById('passwordConfirmInput').value;
+            const phone = document.getElementById('phoneInput').value.trim();
+            const preventionStart = document.getElementById('preventionStartInput').value;
+
+            // 유효성 검사
+            if (!name || !email || !password) {
+                showError('필수 항목을 모두 입력해주세요.');
+                return;
+            }
+
+            if (!preventionStart) {
+                showError('예방과 도입시기를 선택해주세요.');
+                return;
+            }
+
+            if (password !== passwordConfirm) {
+                showError('비밀번호가 일치하지 않습니다.');
+                return;
+            }
+
+            if (password.length < 8) {
+                showError('비밀번호는 8자 이상이어야 합니다.');
+                return;
+            }
+
+            if (!document.getElementById('terms1').checked || !document.getElementById('terms2').checked || !document.getElementById('terms3').checked) {
+                showError('필수 약관에 모두 동의해주세요.');
+                return;
+            }
+
+            if (!inviteData) {
+                showError('초대코드 정보가 없습니다.');
+                return;
+            }
+
+            showLoading('계정 생성 중...');
+            hideError();
+
+            try {
+                // 1. Firebase Auth 계정 생성
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+
+                console.log('✅ Auth 계정 생성 완료:', user.uid);
+
+                // 2. Firestore에 사용자 정보 저장
+                try {
+                    await db.collection('users').doc(user.uid).set({
+                        email: email,
+                        name: name,
+                        phone: phone || '',
+                        hospitalId: inviteData.hospitalId || 'unknown',
+                        hospitalName: inviteData.hospitalName || '',
+                        userType: 'hospital',
+                        inviteCode: inviteData.code || '',
+                        preventionStart: preventionStart,
+                        // 약관 동의 정보
+                        consent: {
+                            serviceTerms: true,
+                            privacyPolicy: true,
+                            dataResearchUsage: true,
+                            consentVersion: '1.0',
+                            consentDate: new Date().toISOString()
+                        },
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    console.log('✅ Firestore 사용자 문서 생성 완료');
+                } catch (firestoreError) {
+                    console.error('❌ Firestore users 저장 실패:', firestoreError);
+                    throw firestoreError;
+                }
+
+                // 3. hospitals 컬렉션에 예방과 도입시기 저장
+                try {
+                    const hospitalId = inviteData.hospitalId || 'unknown';
+                    await db.collection('hospitals').doc(hospitalId).update({
+                        preventionStart: preventionStart
+                    });
+                    console.log('✅ 병원 예방과 도입시기 저장 완료');
+                } catch (hospitalError) {
+                    console.error('❌ 병원 예방과 도입시기 업데이트 실패:', hospitalError);
+                    // 실패해도 계속 진행
+                }
+
+                // 4. 초대코드 사용 처리
+                try {
+                    await db.collection('inviteCodes').doc(inviteData.codeId).update({
+                        used: true,
+                        usedBy: user.uid,
+                        usedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    console.log('✅ 초대코드 사용 처리 완료');
+                } catch (inviteError) {
+                    console.error('❌ 초대코드 업데이트 실패:', inviteError);
+                    // 초대코드 업데이트 실패해도 계속 진행
+                }
+
+                // 5. 세션 정리
+                sessionStorage.removeItem('apsencare_invite');
+
+                hideLoading();
+                showToast('회원가입 완료! 로그인 페이지로 이동합니다 🎉', 'success');
+
+                // 로그아웃 후 로그인 페이지로 이동 (첫 로그인은 직접 하도록)
+                await auth.signOut();
+                
+                setTimeout(() => {
+                    window.location.href = 'apsencare_login_firebase.html';
+                }, 2000);
+
+            } catch (error) {
+                hideLoading();
+                console.error('회원가입 오류:', error);
+
+                let errorMsg = '회원가입에 실패했습니다.';
+                switch (error.code) {
+                    case 'auth/email-already-in-use':
+                        errorMsg = '이미 사용 중인 이메일입니다.';
+                        break;
+                    case 'auth/invalid-email':
+                        errorMsg = '올바른 이메일 형식이 아닙니다.';
+                        break;
+                    case 'auth/weak-password':
+                        errorMsg = '비밀번호가 너무 약합니다. 8자 이상으로 설정해주세요.';
+                        break;
+                }
+                showError(errorMsg);
+            }
+        });
+
+        // ==================== 비밀번호 강도 체크 ====================
+        document.getElementById('passwordInput').addEventListener('input', function(e) {
+            const password = e.target.value;
+            const fill = document.getElementById('strengthFill');
+            const text = document.getElementById('strengthText');
+
+            fill.className = 'strength-fill';
+            
+            if (password.length === 0) {
+                text.textContent = '';
+                return;
+            }
+
+            let strength = 0;
+            if (password.length >= 8) strength++;
+            if (/[A-Z]/.test(password)) strength++;
+            if (/[0-9]/.test(password)) strength++;
+            if (/[^A-Za-z0-9]/.test(password)) strength++;
+
+            if (strength <= 1) {
+                fill.classList.add('weak');
+                text.textContent = '약함';
+                text.style.color = '#ef4444';
+            } else if (strength <= 2) {
+                fill.classList.add('medium');
+                text.textContent = '보통';
+                text.style.color = '#f59e0b';
+            } else {
+                fill.classList.add('strong');
+                text.textContent = '강함';
+                text.style.color = '#10b981';
+            }
+        });
+
+        // 비밀번호 확인 체크
+        document.getElementById('passwordConfirmInput').addEventListener('input', function(e) {
+            const password = document.getElementById('passwordInput').value;
+            const confirm = e.target.value;
+            const hint = document.getElementById('confirmHint');
+
+            if (confirm.length === 0) {
+                hint.textContent = '';
+                e.target.classList.remove('success', 'error');
+                return;
+            }
+
+            if (password === confirm) {
+                hint.textContent = '✓ 비밀번호가 일치합니다';
+                hint.className = 'form-hint success';
+                e.target.classList.add('success');
+                e.target.classList.remove('error');
+            } else {
+                hint.textContent = '✗ 비밀번호가 일치하지 않습니다';
+                hint.className = 'form-hint error';
+                e.target.classList.add('error');
+                e.target.classList.remove('success');
+            }
+        });
+
+        // ==================== 전화번호 자동 포맷 ====================
+        document.getElementById('phoneInput').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^0-9]/g, '');
+            if (value.length > 3 && value.length <= 7) {
+                value = value.slice(0, 3) + '-' + value.slice(3);
+            } else if (value.length > 7) {
+                value = value.slice(0, 3) + '-' + value.slice(3, 7) + '-' + value.slice(7, 11);
+            }
+            e.target.value = value;
+        });
+
+        // ==================== 약관 전체 동의 ====================
+        function toggleAllTerms() {
+            const allChecked = document.getElementById('termsAll').checked;
+            document.querySelectorAll('.term-item').forEach(item => {
+                item.checked = allChecked;
+            });
+        }
+
+        document.querySelectorAll('.term-item').forEach(item => {
+            item.addEventListener('change', function() {
+                const allChecked = Array.from(document.querySelectorAll('.term-item')).every(i => i.checked);
+                document.getElementById('termsAll').checked = allChecked;
+            });
+        });
+
+        // ==================== 약관 모달 ====================
+        let currentTermsType = null;
+
+        const termsContent = {
+            service: {
+                title: '📋 서비스 이용약관',
+                body: `
+                    <h4>제1조 (목적)</h4>
+                    <p>이 약관은 앞선케어(이하 "서비스")가 제공하는 치과 경영분석 서비스의 이용조건 및 절차, 이용자와 서비스 제공자의 권리·의무·책임사항을 규정함을 목적으로 합니다.</p>
+                    
+                    <h4>제2조 (서비스 내용)</h4>
+                    <p>서비스는 치과병(의)원의 진료 데이터를 분석하여 환자 유지율, 이탈율, 수납성장률 등의 경영 지표를 제공합니다. 분석은 사용자가 업로드한 엑셀 파일을 기반으로 브라우저 내에서 처리됩니다.</p>
+                    
+                    <h4>제3조 (회원가입 및 이용)</h4>
+                    <p>서비스 이용을 위해 초대코드를 통한 회원가입이 필요합니다. 회원은 정확한 정보를 제공해야 하며, 타인의 계정을 도용하거나 허위 정보를 등록해서는 안 됩니다.</p>
+                    
+                    <h4>제4조 (서비스 이용의 제한)</h4>
+                    <p>서비스는 다음의 경우 이용을 제한할 수 있습니다: 타인의 개인정보를 무단으로 수집·이용하는 경우, 서비스의 안정적 운영을 방해하는 경우, 기타 관련 법령에 위배되는 행위를 하는 경우.</p>
+                    
+                    <h4>제5조 (면책조항)</h4>
+                    <p>서비스가 제공하는 분석 결과는 참고용이며, 이를 근거로 한 경영 판단에 대한 책임은 이용자에게 있습니다.</p>
+                `
+            },
+            privacy: {
+                title: '🔒 개인정보 처리방침',
+                body: `
+                    <h4>1. 수집하는 개인정보 항목</h4>
+                    <div class="highlight-box">
+                        <ul>
+                            <li><strong>필수:</strong> 이메일, 비밀번호, 병원이름</li>
+                            <li><strong>선택:</strong> 전화번호</li>
+                        </ul>
+                    </div>
+                    
+                    <h4>2. 개인정보의 수집 및 이용 목적</h4>
+                    <p>회원 식별 및 서비스 제공, 고객 지원, 서비스 개선을 위해 수집합니다.</p>
+                    
+                    <h4>3. 환자 데이터 처리 방식</h4>
+                    <div class="highlight-box">
+                        <ul>
+                            <li>업로드된 엑셀 파일은 <strong>브라우저 내에서만 처리</strong>되며, 서버에 저장되지 않습니다.</li>
+                            <li>분석 완료 후 원본 파일은 <strong>즉시 폐기</strong>됩니다.</li>
+                            <li>서버에는 개인을 식별할 수 없는 <strong>집계된 통계값만 저장</strong>됩니다.</li>
+                        </ul>
+                    </div>
+                    
+                    <h4>4. 개인정보의 보유 및 이용기간</h4>
+                    <p>회원 탈퇴 시까지 보유하며, 탈퇴 즉시 지체 없이 파기합니다.</p>
+                    
+                    <h4>5. 개인정보의 제3자 제공</h4>
+                    <p>이용자의 동의 없이 개인정보를 제3자에게 제공하지 않습니다.</p>
+                `
+            },
+            data: {
+                title: '📊 통계 데이터 학술연구 활용 동의',
+                body: `
+                    <h4>1. 수집하는 데이터의 범위</h4>
+                    <div class="highlight-box">
+                        <ul>
+                            <li>업로드된 자료에서 산출된 <strong>개인식별이 불가능한 통계 결과값</strong>만 수집합니다.</li>
+                            <li>수집 항목: 환자 유지율, 이탈율, 수납성장률, 진료 카테고리별 비율 등</li>
+                            <li><strong>환자 이름, 차트번호 등 개인정보는 일체 수집하지 않습니다.</strong></li>
+                        </ul>
+                    </div>
+
+                    <h4>2. 데이터 처리 방식</h4>
+                    <div class="highlight-box">
+                        <ul>
+                            <li>원본 엑셀 파일은 브라우저 내에서만 처리되며 서버에 저장되지 않습니다.</li>
+                            <li>분석 결과 중 통계값만 암호화되어 서버에 저장됩니다.</li>
+                            <li>저장된 통계값으로는 개별 환자를 식별할 수 없습니다.</li>
+                        </ul>
+                    </div>
+
+                    <h4>3. 활용 목적</h4>
+                    <div class="highlight-box">
+                        <ul>
+                            <li>수집된 통계 데이터는 <strong>학술 연구 및 비영리 목적으로만</strong> 활용됩니다.</li>
+                            <li>치과 경영, 환자 관리 개선 등 치의학 분야 발전을 위한 연구에 사용됩니다.</li>
+                            <li>상업적 목적의 데이터 판매나 마케팅에는 절대 활용되지 않습니다.</li>
+                        </ul>
+                    </div>
+
+                    <h4>4. 병원 익명 처리</h4>
+                    <p>연구 결과 발표 시 병원명은 <strong>A병원, B병원 등으로 익명 처리</strong>되며, 특정 병원을 식별할 수 있는 정보는 공개되지 않습니다.</p>
+
+                    <h4>5. 동의 철회 권리</h4>
+                    <div class="highlight-box">
+                        <ul>
+                            <li>동의는 언제든지 철회할 수 있습니다.</li>
+                            <li>철회 요청 시 해당 병원의 데이터는 이후 분석에서 제외됩니다.</li>
+                            <li>단, 이미 익명화되어 발표된 연구 결과에서의 소급 제거는 불가능할 수 있습니다.</li>
+                            <li>철회 요청: 앞선케어 관리자에게 직접 연락</li>
+                        </ul>
+                    </div>
+
+                    <h4>6. 데이터 보호</h4>
+                    <p>수집된 통계 데이터는 접근 권한이 제한된 보안 환경에서 관리되며, 연구 책임자만 접근 가능합니다.</p>
+                `
+            }
+        };
+
+        function openTermsModal(type) {
+            currentTermsType = type;
+            const content = termsContent[type];
+            document.getElementById('termsModalTitle').textContent = content.title;
+            document.getElementById('termsModalBody').innerHTML = content.body;
+            document.getElementById('termsModalOverlay').classList.add('show');
+            document.body.style.overflow = 'hidden';
+
+            // 동의 버튼 텍스트 설정
+            const checkboxMap = { service: 'terms1', privacy: 'terms2', data: 'terms3' };
+            const isChecked = document.getElementById(checkboxMap[type]).checked;
+            document.getElementById('termsModalAgreeBtn').textContent = isChecked ? '확인' : '동의하기';
+        }
+
+        function closeTermsModal() {
+            document.getElementById('termsModalOverlay').classList.remove('show');
+            document.body.style.overflow = '';
+            currentTermsType = null;
+        }
+
+        function agreeAndClose() {
+            if (currentTermsType) {
+                const checkboxMap = { service: 'terms1', privacy: 'terms2', data: 'terms3' };
+                document.getElementById(checkboxMap[currentTermsType]).checked = true;
+                // 전체 동의 상태 업데이트
+                const allChecked = Array.from(document.querySelectorAll('.term-item')).every(i => i.checked);
+                document.getElementById('termsAll').checked = allChecked;
+            }
+            closeTermsModal();
+        }
+
+        // ==================== 유틸리티 ====================
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const btn = event.target;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        function showLoading(text) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('show');
+        }
+
+        function showError(message) {
+            const el = document.getElementById('errorMessage');
+            el.textContent = message;
+            el.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').classList.remove('show');
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+    </script>
+</body>
+</html>

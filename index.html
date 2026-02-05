@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>앞선케어 - 로그인</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK (compat 버전 - 안정적인 9.x) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', 'Noto Sans KR', sans-serif; background: #f9fafb; min-height: 100vh; display: flex; }
+        .login-page { display: flex; width: 100%; min-height: 100vh; }
+
+        /* 좌측: 로그인 영역 */
+        .login-section {
+            width: 420px;
+            min-width: 420px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 48px;
+            box-shadow: 4px 0 30px rgba(0, 0, 0, 0.08);
+            position: relative;
+            z-index: 10;
+        }
+
+        .login-container { width: 100%; max-width: 340px; }
+
+        .login-header { margin-bottom: 32px; }
+        .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+        .logo-circle { width: 44px; height: 44px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid #ec4899; }
+        .logo-text-group { text-align: left; }
+        .logo-main { font-family: 'Noto Sans KR', sans-serif; font-size: 20px; font-weight: 700; color: #1f2937; }
+        .logo-sub { font-size: 10px; color: #ec4899; font-weight: 600; text-transform: uppercase; }
+
+        .welcome-text { font-size: 26px; font-weight: 700; color: #1f2937; margin-bottom: 8px; }
+        .welcome-desc { font-size: 14px; color: #6b7280; }
+
+        /* 폼 스타일 */
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+        .input-wrapper { position: relative; }
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1.5px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: #f9fafb;
+        }
+        .form-input:focus { outline: none; border-color: #ec4899; background: white; box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1); }
+        .form-input.error { border-color: #ef4444; background: #fef2f2; }
+
+        .password-toggle { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 16px; color: #9ca3af; }
+
+        .form-options { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; font-size: 13px; }
+        .remember-me { display: flex; align-items: center; gap: 6px; color: #6b7280; cursor: pointer; }
+        .remember-me input { accent-color: #ec4899; }
+        .forgot-password { color: #ec4899; text-decoration: none; font-weight: 500; }
+        .forgot-password:hover { text-decoration: underline; }
+
+        .login-button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #f472b6, #ec4899);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .login-button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(236, 72, 153, 0.3); }
+        .login-button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* 구분선 */
+        .divider { display: flex; align-items: center; gap: 16px; margin: 28px 0; }
+        .divider-line { flex: 1; height: 1px; background: #e5e7eb; }
+        .divider-text { font-size: 12px; color: #9ca3af; }
+
+        /* 초대코드 섹션 */
+        .invite-section { background: #fdf2f8; border-radius: 12px; padding: 20px; }
+        .invite-title { font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 4px; }
+        .invite-desc { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
+        .invite-input-group { display: flex; gap: 8px; }
+        .invite-input {
+            flex: 1;
+            padding: 12px 14px;
+            border: 1.5px solid #fbcfe8;
+            border-radius: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+            background: white;
+        }
+        .invite-input:focus { outline: none; border-color: #ec4899; }
+        .invite-button {
+            padding: 12px 20px;
+            background: #ec4899;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .invite-button:hover { background: #db2777; }
+
+        /* 우측: 소개 영역 */
+        .intro-section {
+            flex: 1;
+            background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 50%, #fbcfe8 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .intro-section::before {
+            content: '';
+            position: absolute;
+            top: -20%;
+            right: -10%;
+            width: 500px;
+            height: 500px;
+            background: rgba(236, 72, 153, 0.1);
+            border-radius: 50%;
+        }
+
+        .intro-content { position: relative; z-index: 1; max-width: 560px; text-align: center; }
+
+        .intro-logo { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 36px; }
+        .intro-logo-circle { width: 80px; height: 80px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; border: 3px solid #ec4899; box-shadow: 0 8px 30px rgba(236, 72, 153, 0.2); }
+        .intro-logo-text { text-align: left; }
+        .intro-logo-main { font-family: 'Noto Sans KR', sans-serif; font-size: 36px; font-weight: 800; color: #1f2937; }
+        .intro-logo-sub { font-size: 12px; color: #ec4899; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+
+        .intro-badge { display: inline-block; background: rgba(236, 72, 153, 0.15); color: #be185d; padding: 8px 18px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 20px; }
+        .intro-title { font-size: 32px; font-weight: 700; color: #1f2937; margin-bottom: 16px; line-height: 1.4; }
+        .intro-title span { color: #ec4899; }
+        .intro-desc { font-size: 16px; color: #4b5563; line-height: 1.8; margin-bottom: 40px; }
+
+        .values-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 40px; }
+        .value-card { background: white; border-radius: 12px; padding: 20px 16px; text-align: center; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06); transition: all 0.2s; }
+        .value-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(236, 72, 153, 0.15); }
+        .value-icon { width: 48px; height: 48px; background: linear-gradient(135deg, #fdf2f8, #fce7f3); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 22px; }
+        .value-card h4 { font-size: 14px; font-weight: 700; color: #1f2937; margin-bottom: 4px; }
+        .value-card p { font-size: 11px; color: #6b7280; }
+
+        .cdhc-box { background: white; border-radius: 12px; padding: 20px; text-align: left; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06); }
+        .cdhc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .cdhc-header span { font-size: 20px; }
+        .cdhc-header h4 { font-size: 14px; font-weight: 700; color: #1f2937; }
+        .cdhc-box p { font-size: 13px; color: #4b5563; line-height: 1.7; }
+
+        /* 에러 메시지 */
+        .error-message {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .error-message.show { display: block; }
+
+        /* 로딩 */
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        .loading-overlay.show { opacity: 1; visibility: visible; }
+        .loading-spinner { width: 48px; height: 48px; border: 4px solid #fce7f3; border-top-color: #ec4899; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: #6b7280; font-size: 14px; }
+
+        /* 토스트 */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 9999;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { background: #10b981; color: white; }
+        .toast.error { background: #ef4444; color: white; }
+        .toast.info { background: #3b82f6; color: white; }
+
+        /* 반응형 */
+        @media (max-width: 1024px) {
+            .intro-section { display: none; }
+            .login-section { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 로딩 오버레이 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">로그인 중...</div>
+    </div>
+
+    <!-- 토스트 -->
+    <div class="toast" id="toast"></div>
+
+    <div class="login-page">
+        <!-- 좌측: 로그인 폼 -->
+        <div class="login-section">
+            <div class="login-container">
+                <div class="login-header">
+                    <div class="logo">
+                        <div class="logo-circle">🦷</div>
+                        <div class="logo-text-group">
+                            <div class="logo-main">앞선케어</div>
+                            <div class="logo-sub">Advanced Care Platform</div>
+                        </div>
+                    </div>
+                    <h1 class="welcome-text">환영합니다 👋</h1>
+                    <p class="welcome-desc">계정에 로그인하여 서비스를 이용하세요</p>
+                </div>
+
+                <!-- 에러 메시지 -->
+                <div class="error-message" id="errorMessage"></div>
+
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label class="form-label">이메일</label>
+                        <input type="email" class="form-input" id="emailInput" placeholder="example@hospital.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">비밀번호</label>
+                        <div class="input-wrapper">
+                            <input type="password" class="form-input" id="passwordInput" placeholder="비밀번호를 입력하세요" required>
+                            <button type="button" class="password-toggle" onclick="togglePassword()">👁️</button>
+                        </div>
+                    </div>
+
+                    <div class="form-options">
+                        <label class="remember-me">
+                            <input type="checkbox" id="rememberMe">
+                            로그인 상태 유지
+                        </label>
+                        <a href="#" class="forgot-password" onclick="handleForgotPassword(event)">비밀번호 찾기</a>
+                    </div>
+
+                    <button type="submit" class="login-button" id="loginBtn">로그인</button>
+                </form>
+
+                <div class="divider">
+                    <div class="divider-line"></div>
+                    <span class="divider-text">처음이신가요?</span>
+                    <div class="divider-line"></div>
+                </div>
+
+                <div class="invite-section">
+                    <h3 class="invite-title">🎫 초대코드로 등록하기</h3>
+                    <p class="invite-desc">앞선케어 파트너 병원에게 발급된 초대코드를 입력하세요</p>
+                    <div class="invite-input-group">
+                        <input type="text" class="invite-input" id="inviteCodeInput" placeholder="XXXX-XXXX" maxlength="9">
+                        <button class="invite-button" onclick="handleInviteCode()">등록</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 우측: 앞선케어 소개 -->
+        <div class="intro-section">
+            <div class="intro-content">
+                <div class="intro-logo">
+                    <div class="intro-logo-circle">🦷</div>
+                    <div class="intro-logo-text">
+                        <div class="intro-logo-main">앞선케어</div>
+                        <div class="intro-logo-sub">Advanced Care Platform</div>
+                    </div>
+                </div>
+                
+                <span class="intro-badge">💜 예방치과 전문 컨설팅</span>
+                
+                <h2 class="intro-title">
+                    "예방이 먼저입니다.<br>
+                    <span>앞선케어</span>가 함께합니다."
+                </h2>
+                
+                <p class="intro-desc">
+                    앞선케어는 포괄치과위생관리(CDHC)를 기반으로<br>
+                    치과위생사의 전문성을 높이고, 환자 중심의<br>
+                    예방 진료 문화를 확산하는 예방치과 전문 팀입니다.
+                </p>
+
+                <div class="values-grid">
+                    <div class="value-card">
+                        <div class="value-icon">👤</div>
+                        <h4>환자 중심</h4>
+                        <p>Patient-Centered</p>
+                    </div>
+                    <div class="value-card">
+                        <div class="value-icon">🔬</div>
+                        <h4>근거 기반</h4>
+                        <p>Evidence-Based</p>
+                    </div>
+                    <div class="value-card">
+                        <div class="value-icon">🛡️</div>
+                        <h4>예방 우선</h4>
+                        <p>Prevention-First</p>
+                    </div>
+                </div>
+
+                <div class="cdhc-box">
+                    <div class="cdhc-header">
+                        <span>📘</span>
+                        <h4>CDHC란?</h4>
+                    </div>
+                    <p>
+                        <strong>포괄치과위생관리</strong>(Comprehensive Dental Hygiene Care)는 
+                        환자 개개인의 구강건강 상태와 위험요인을 종합적으로 평가하여, 
+                        예방 중심의 맞춤형 치주관리를 제공하는 체계적인 치과위생 관리 과정입니다.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Firebase 초기화 ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrU3rYs4fxlMkr8r0sjo70Mt0Al-HUtyg",
+            authDomain: "apseoncare-platform.firebaseapp.com",
+            projectId: "apseoncare-platform",
+            storageBucket: "apseoncare-platform.firebasestorage.app",
+            messagingSenderId: "515333523928",
+            appId: "1:515333523928:web:e19a9db63c522d8484caad",
+            measurementId: "G-CG28CTJNXP"
+        };
+
+        // Firebase 앱 초기화
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        console.log('🔥 Firebase 초기화 완료! (앞선케어)');
+
+        // ==================== 로그인 상태 체크 ====================
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                console.log('이미 로그인됨:', user.email);
+                await redirectToDashboard(user.uid);
+            }
+        });
+
+        // ==================== 로그인 처리 ====================
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('emailInput').value.trim();
+            const password = document.getElementById('passwordInput').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
+
+            if (!email || !password) {
+                showError('이메일과 비밀번호를 입력해주세요.');
+                return;
+            }
+
+            showLoading('로그인 중...');
+            hideError();
+
+            try {
+                const persistence = rememberMe 
+                    ? firebase.auth.Auth.Persistence.LOCAL 
+                    : firebase.auth.Auth.Persistence.SESSION;
+                
+                await auth.setPersistence(persistence);
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+
+                console.log('✅ 로그인 성공:', user.email);
+                await redirectToDashboard(user.uid);
+
+            } catch (error) {
+                hideLoading();
+                console.error('로그인 오류:', error);
+
+                let errorMsg = '로그인에 실패했습니다.';
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                        errorMsg = '등록되지 않은 이메일입니다.';
+                        break;
+                    case 'auth/wrong-password':
+                        errorMsg = '비밀번호가 올바르지 않습니다.';
+                        break;
+                    case 'auth/invalid-email':
+                        errorMsg = '올바른 이메일 형식이 아닙니다.';
+                        break;
+                    case 'auth/too-many-requests':
+                        errorMsg = '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.';
+                        break;
+                    case 'auth/invalid-credential':
+                        errorMsg = '이메일 또는 비밀번호가 올바르지 않습니다.';
+                        break;
+                }
+                showError(errorMsg);
+            }
+        });
+
+        // ==================== 대시보드 리다이렉트 ====================
+        async function redirectToDashboard(uid) {
+            try {
+                const userDoc = await db.collection('users').doc(uid).get();
+
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    
+                    sessionStorage.setItem('apsencare_user', JSON.stringify({
+                        uid: uid,
+                        email: userData.email,
+                        name: userData.name,
+                        hospitalId: userData.hospitalId,
+                        userType: userData.userType
+                    }));
+
+                    hideLoading();
+                    showToast('로그인 성공! 환영합니다 🎉', 'success');
+
+                    setTimeout(() => {
+                        if (userData.userType === 'admin') {
+                            window.location.href = 'apsencare_admin_firebase.html';
+                        } else {
+                            window.location.href = 'apsencare_hospital_home_firebase.html';
+                        }
+                    }, 1000);
+                } else {
+                    hideLoading();
+                    showError('사용자 정보를 찾을 수 없습니다. 관리자에게 문의하세요.');
+                    await auth.signOut();
+                }
+            } catch (error) {
+                hideLoading();
+                console.error('사용자 정보 조회 오류:', error);
+                showError('사용자 정보를 불러오는데 실패했습니다.');
+            }
+        }
+
+        // ==================== 초대코드 처리 ====================
+        async function handleInviteCode() {
+            const code = document.getElementById('inviteCodeInput').value.trim().toUpperCase();
+
+            if (!code) {
+                showToast('초대코드를 입력해주세요.', 'error');
+                return;
+            }
+
+            if (code.length < 4) {
+                showToast('올바른 초대코드 형식이 아닙니다.', 'error');
+                return;
+            }
+
+            showLoading('초대코드 확인 중...');
+
+            try {
+                // 인덱스 없이 작동하도록 code만으로 검색
+                const codeQuery = await db.collection('inviteCodes')
+                    .where('code', '==', code)
+                    .limit(1)
+                    .get();
+
+                if (codeQuery.empty) {
+                    hideLoading();
+                    showToast('유효하지 않은 초대코드입니다.', 'error');
+                    return;
+                }
+
+                const codeDoc = codeQuery.docs[0];
+                const codeData = codeDoc.data();
+
+                // 사용 여부 체크 (클라이언트에서)
+                if (codeData.used === true) {
+                    hideLoading();
+                    showToast('이미 사용된 초대코드입니다.', 'error');
+                    return;
+                }
+
+                // 만료일 체크
+                if (codeData.expiresAt && codeData.expiresAt.toDate() < new Date()) {
+                    hideLoading();
+                    showToast('만료된 초대코드입니다.', 'error');
+                    return;
+                }
+
+                hideLoading();
+
+                console.log('📋 초대코드 데이터:', codeData);
+
+                sessionStorage.setItem('apsencare_invite', JSON.stringify({
+                    codeId: codeDoc.id,
+                    code: code,
+                    hospitalId: codeData.hospitalId || codeData.hospital_id || '',
+                    hospitalName: codeData.hospitalName || codeData.hospital_name || ''
+                }));
+
+                showToast('초대코드 확인 완료! 회원가입을 진행합니다.', 'success');
+                
+                setTimeout(() => {
+                    window.location.href = 'apsencare_signup_firebase.html';
+                }, 1000);
+
+            } catch (error) {
+                hideLoading();
+                console.error('초대코드 확인 오류:', error);
+                showToast('초대코드 확인 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // 초대코드 입력 자동 포맷팅
+        document.getElementById('inviteCodeInput').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            if (value.length > 4) {
+                value = value.slice(0, 4) + '-' + value.slice(4, 8);
+            }
+            e.target.value = value;
+        });
+
+        // ==================== 비밀번호 찾기 ====================
+        async function handleForgotPassword(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('emailInput').value.trim();
+            
+            if (!email) {
+                showToast('이메일을 먼저 입력해주세요.', 'info');
+                document.getElementById('emailInput').focus();
+                return;
+            }
+
+            showLoading('비밀번호 재설정 이메일 발송 중...');
+
+            try {
+                await auth.sendPasswordResetEmail(email);
+                hideLoading();
+                showToast('비밀번호 재설정 이메일을 발송했습니다. 📧', 'success');
+            } catch (error) {
+                hideLoading();
+                if (error.code === 'auth/user-not-found') {
+                    showToast('등록되지 않은 이메일입니다.', 'error');
+                } else {
+                    showToast('이메일 발송에 실패했습니다.', 'error');
+                }
+            }
+        }
+
+        // ==================== 유틸리티 함수 ====================
+        function togglePassword() {
+            const input = document.getElementById('passwordInput');
+            const btn = event.target;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        function showLoading(text) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('show');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('show');
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').classList.remove('show');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        document.getElementById('inviteCodeInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleInviteCode();
+            }
+        });
+    </script>
+</body>
+</html>

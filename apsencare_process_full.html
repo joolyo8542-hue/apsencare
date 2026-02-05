@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>앞선케어 - 치주관리 프로세스</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            background: #f9fafb;
+            color: #1a1a1a;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .app-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-circle {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #fce7f3, #fbcfe8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            border: 2px solid #ec4899;
+            flex-shrink: 0;
+        }
+
+        .logo-text-group {
+            text-align: left;
+        }
+
+        .logo-main {
+            font-family: 'Noto Sans KR', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .logo-sub {
+            font-size: 9px;
+            color: #ec4899;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .nav-section {
+            flex: 1;
+            padding: 12px 0;
+            overflow-y: auto;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: #4b5563;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: #fdf2f8;
+            color: #ec4899;
+        }
+
+        .nav-item.active {
+            background: #fdf2f8;
+            color: #ec4899;
+            border-left-color: #ec4899;
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .nav-label {
+            flex: 1;
+        }
+
+        .nav-badge {
+            background: #10b981;
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .nav-divider {
+            height: 1px;
+            background: #e5e7eb;
+            margin: 12px 20px;
+        }
+
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #f472b6, #ec4899);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .user-role {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .logout-btn:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        /* 메인 콘텐츠 */
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+        }
+
+        .top-header {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .page-title h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .page-title p {
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #f472b6, #ec4899);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(236, 72, 153, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .content-area {
+            padding: 24px 32px;
+        }
+
+        /* 프로세스 흐름도 */
+        .process-flow {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .process-flow-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .process-steps {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        .process-steps::before {
+            content: '';
+            position: absolute;
+            top: 32px;
+            left: 60px;
+            right: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #fce7f3, #fbcfe8, #f9a8d4, #f472b6, #ec4899);
+            z-index: 0;
+        }
+
+        .process-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .process-step:hover .step-circle {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(236, 72, 153, 0.3);
+        }
+
+        .step-circle {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+            border: 3px solid white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .step-circle.step-1 { background: linear-gradient(135deg, #fce7f3, #fbcfe8); }
+        .step-circle.step-2 { background: linear-gradient(135deg, #fbcfe8, #f9a8d4); }
+        .step-circle.step-3 { background: linear-gradient(135deg, #f9a8d4, #f472b6); }
+        .step-circle.step-4 { background: linear-gradient(135deg, #f472b6, #ec4899); }
+        .step-circle.step-5 { background: linear-gradient(135deg, #ec4899, #db2777); }
+
+        .process-step.active .step-circle {
+            border-color: #ec4899;
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(236, 72, 153, 0.35);
+        }
+
+        .step-number {
+            font-size: 10px;
+            color: #9ca3af;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .step-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .step-desc {
+            font-size: 11px;
+            color: #6b7280;
+            max-width: 120px;
+        }
+
+        .process-step.active .step-name {
+            color: #ec4899;
+        }
+
+        /* 탭 네비게이션 */
+        .step-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .step-tab {
+            padding: 10px 16px;
+            background: #f3f4f6;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .step-tab:hover {
+            background: #fdf2f8;
+            color: #ec4899;
+        }
+
+        .step-tab.active {
+            background: linear-gradient(135deg, #f472b6, #ec4899);
+            color: white;
+        }
+
+        /* 단계별 콘텐츠 */
+        .step-content {
+            display: none;
+        }
+
+        .step-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 단계별 상세 콘텐츠 */
+        .step-detail {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-link {
+            font-size: 12px;
+            color: #ec4899;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .card-link:hover {
+            text-decoration: underline;
+        }
+
+        /* 핵심 포인트 */
+        .key-points {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .key-point {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px;
+            background: #f9fafb;
+            border-radius: 10px;
+            border-left: 3px solid #ec4899;
+        }
+
+        .key-point-icon {
+            width: 32px;
+            height: 32px;
+            background: #fdf2f8;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .key-point-content h4 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .key-point-content p {
+            font-size: 12px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        /* 체크리스트 */
+        .checklist {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .check-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .check-item:hover {
+            background: #fdf2f8;
+        }
+
+        .check-item.checked {
+            background: #dcfce7;
+        }
+
+        .check-box {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #d1d5db;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+            font-size: 12px;
+        }
+
+        .check-item.checked .check-box {
+            background: #16a34a;
+            border-color: #16a34a;
+            color: white;
+        }
+
+        .check-text {
+            font-size: 13px;
+            color: #374151;
+            flex: 1;
+        }
+
+        .check-item.checked .check-text {
+            text-decoration: line-through;
+            color: #6b7280;
+        }
+
+        /* 교육 자료 그리드 */
+        .resources-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .resource-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: #f9fafb;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .resource-card:hover {
+            background: #fdf2f8;
+            border-color: #fbcfe8;
+        }
+
+        .resource-thumb {
+            width: 56px;
+            height: 56px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .resource-thumb.video {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+        }
+
+        .resource-thumb.pdf {
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        }
+
+        .resource-thumb.ppt {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+        }
+
+        .resource-thumb.doc {
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+        }
+
+        .resource-info h4 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .resource-meta {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .resource-type {
+            display: inline-block;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        .resource-type.video { background: #fee2e2; color: #dc2626; }
+        .resource-type.pdf { background: #dbeafe; color: #2563eb; }
+        .resource-type.ppt { background: #fef3c7; color: #b45309; }
+
+        /* 전체 프로세스 가이드 다운로드 */
+        .download-banner {
+            background: linear-gradient(135deg, #fdf2f8, #fce7f3);
+            border: 2px dashed #fbcfe8;
+            border-radius: 12px;
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 24px;
+        }
+
+        .download-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .download-icon {
+            width: 48px;
+            height: 48px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .download-text h4 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 2px;
+        }
+
+        .download-text p {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        /* 반응형 */
+        @media (max-width: 1200px) {
+            .step-detail {
+                grid-template-columns: 1fr;
+            }
+            .resources-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .process-steps {
+                flex-direction: column;
+                gap: 20px;
+                align-items: center;
+            }
+            .process-steps::before {
+                display: none;
+            }
+            .process-step {
+                flex-direction: row;
+                text-align: left;
+                gap: 16px;
+                width: 100%;
+                max-width: 400px;
+            }
+            .step-circle {
+                margin-bottom: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 60px;
+            }
+            .logo-text-group, .nav-label, .nav-badge, .user-info {
+                display: none;
+            }
+            .nav-item {
+                justify-content: center;
+                padding: 14px;
+            }
+            .main-content {
+                margin-left: 60px;
+            }
+            .content-area {
+                padding: 16px;
+            }
+            .download-banner {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+            .download-info {
+                flex-direction: column;
+            }
+            .step-tabs {
+                gap: 6px;
+            }
+            .step-tab {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- 사이드바 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-circle">🦷</div>
+                    <div class="logo-text-group">
+                        <div class="logo-main">앞선케어</div>
+                        <div class="logo-sub">Advanced Care Platform</div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="nav-section">
+                <a class="nav-item" href="apsencare_hospital_home_firebase.html">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-label">홈</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">💜</span>
+                    <span class="nav-label">앞선케어 소개</span>
+                </a>
+                <a class="nav-item active" href="apsencare_process_full.html">
+                    <span class="nav-icon">🦷</span>
+                    <span class="nav-label">치주관리 프로세스</span>
+                </a>
+                <a class="nav-item" href="apsencare_analytics_full.html">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">성과 분석</span>
+                    <span class="nav-badge">New</span>
+                </a>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">📞</span>
+                    <span class="nav-label">리콜시스템</span>
+                </a>
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">🎓</span>
+                    <span class="nav-label">임상교육자과정</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <a class="nav-item" href="#">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-label">설정</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar" id="userAvatar">-</div>
+                    <div class="user-info">
+                        <div class="user-name" id="userName">로딩 중...</div>
+                        <div class="user-role" id="userRole">-</div>
+                    </div>
+                    <button class="logout-btn" title="로그아웃" onclick="handleLogout()">🚪</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 메인 콘텐츠 -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="page-title">
+                    <h1>🦷 치주관리 프로세스</h1>
+                    <p>CDHC 기반 체계적인 치주관리 단계별 가이드</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary">📥 전체 자료 다운로드</button>
+                    <button class="btn btn-primary">📋 체크리스트 인쇄</button>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- 프로세스 흐름도 -->
+                <div class="process-flow">
+                    <h2 class="process-flow-title">📍 CDHC 치주관리 5단계 프로세스</h2>
+                    <div class="process-steps">
+                        <div class="process-step active" onclick="selectStep(1)">
+                            <div class="step-circle step-1">👋</div>
+                            <span class="step-number">STEP 1</span>
+                            <span class="step-name">초진상담</span>
+                            <span class="step-desc">환자 주소 파악 및 신뢰관계 형성</span>
+                        </div>
+                        <div class="process-step" onclick="selectStep(2)">
+                            <div class="step-circle step-2">🔬</div>
+                            <span class="step-number">STEP 2</span>
+                            <span class="step-name">검사/평가</span>
+                            <span class="step-desc">치주검사, 위험요인 평가</span>
+                        </div>
+                        <div class="process-step" onclick="selectStep(3)">
+                            <div class="step-circle step-3">📋</div>
+                            <span class="step-number">STEP 3</span>
+                            <span class="step-name">치료계획</span>
+                            <span class="step-desc">맞춤형 치료계획 수립</span>
+                        </div>
+                        <div class="process-step" onclick="selectStep(4)">
+                            <div class="step-circle step-4">🩺</div>
+                            <span class="step-number">STEP 4</span>
+                            <span class="step-name">시술</span>
+                            <span class="step-desc">스케일링, 치주치료</span>
+                        </div>
+                        <div class="process-step" onclick="selectStep(5)">
+                            <div class="step-circle step-5">🔄</div>
+                            <span class="step-number">STEP 5</span>
+                            <span class="step-name">유지관리</span>
+                            <span class="step-desc">정기검진, 리콜관리</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 단계별 탭 -->
+                <div class="step-tabs">
+                    <button class="step-tab active" onclick="selectStep(1)">👋 초진상담</button>
+                    <button class="step-tab" onclick="selectStep(2)">🔬 검사/평가</button>
+                    <button class="step-tab" onclick="selectStep(3)">📋 치료계획</button>
+                    <button class="step-tab" onclick="selectStep(4)">🩺 시술</button>
+                    <button class="step-tab" onclick="selectStep(5)">🔄 유지관리</button>
+                </div>
+
+                <!-- ========== STEP 1: 초진상담 ========== -->
+                <div class="step-content active" id="content-1">
+                    <div class="step-detail">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">💡 핵심 포인트</h3>
+                            </div>
+                            <div class="key-points">
+                                <div class="key-point">
+                                    <div class="key-point-icon">🎯</div>
+                                    <div class="key-point-content">
+                                        <h4>환자 주소(Chief Complaint) 파악</h4>
+                                        <p>환자가 내원한 주된 이유와 기대하는 결과를 명확히 파악합니다. 개방형 질문을 활용하세요.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">🤝</div>
+                                    <div class="key-point-content">
+                                        <h4>MI(동기부여면담) 기법 적용</h4>
+                                        <p>환자의 변화 동기를 이끌어내는 대화 기법을 활용하여 자발적인 구강건강 관리 의지를 높입니다.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">📝</div>
+                                    <div class="key-point-content">
+                                        <h4>병력 및 생활습관 확인</h4>
+                                        <p>전신질환, 복용약물, 흡연, 식습관 등 치주건강에 영향을 미치는 요인을 체계적으로 확인합니다.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">✅ 초진상담 체크리스트</h3>
+                                <span class="card-link check-count">0/7 완료</span>
+                            </div>
+                            <div class="checklist">
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">환자 주소(C.C) 파악 완료</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">전신병력 문진표 작성</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">복용약물 확인</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">흡연/음주 습관 확인</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">구강위생 습관 파악</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">환자 기대치 확인</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">다음 방문 일정 안내</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">📚 관련 교육 자료</h3>
+                            <a href="#" class="card-link">전체보기 →</a>
+                        </div>
+                        <div class="resources-grid">
+                            <div class="resource-card">
+                                <div class="resource-thumb video">▶️</div>
+                                <div class="resource-info">
+                                    <h4>MI 기법 기초 - 개방형 질문</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type video">영상</span>12:34 · 조회 245
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb pdf">📄</div>
+                                <div class="resource-info">
+                                    <h4>초진 문진표 양식</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type pdf">PDF</span>2페이지 · 다운로드 189
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb video">▶️</div>
+                                <div class="resource-info">
+                                    <h4>환자 상담 실전 롤플레이</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type video">영상</span>18:22 · 조회 178
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb ppt">📊</div>
+                                <div class="resource-info">
+                                    <h4>CDHC 초진상담 가이드</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type ppt">PPT</span>15슬라이드 · 다운로드 156
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== STEP 2: 검사/평가 ========== -->
+                <div class="step-content" id="content-2">
+                    <div class="step-detail">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">💡 핵심 포인트</h3>
+                            </div>
+                            <div class="key-points">
+                                <div class="key-point">
+                                    <div class="key-point-icon">📏</div>
+                                    <div class="key-point-content">
+                                        <h4>치주낭 깊이 측정 (6점법)</h4>
+                                        <p>각 치아의 6개 부위(근심협측, 협측중앙, 원심협측, 근심설측, 설측중앙, 원심설측)에서 탐침 깊이를 측정합니다.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">🩸</div>
+                                    <div class="key-point-content">
+                                        <h4>출혈지수(BOP) 기록</h4>
+                                        <p>탐침 시 출혈 여부를 기록하여 활동성 염증 상태를 평가합니다. BOP 10% 이하가 치주 안정 상태의 기준입니다.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">⚠️</div>
+                                    <div class="key-point-content">
+                                        <h4>위험요인 평가</h4>
+                                        <p>흡연, 당뇨, 스트레스, 유전적 요인 등 치주질환 진행에 영향을 미치는 위험요인을 종합적으로 평가합니다.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">✅ 검사/평가 체크리스트</h3>
+                                <span class="card-link check-count">0/8 완료</span>
+                            </div>
+                            <div class="checklist">
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">치주낭 깊이 측정 (6점법)</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">출혈지수(BOP) 기록</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">치태지수 측정</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">치아 동요도 검사</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">방사선 사진 촬영/판독</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">구강 내 사진 촬영</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">위험요인 평가 완료</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">치주질환 단계 분류</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">📚 관련 교육 자료</h3>
+                            <a href="#" class="card-link">전체보기 →</a>
+                        </div>
+                        <div class="resources-grid">
+                            <div class="resource-card">
+                                <div class="resource-thumb video">▶️</div>
+                                <div class="resource-info">
+                                    <h4>치주낭 측정 실습 영상</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type video">영상</span>15:20 · 조회 312
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb pdf">📄</div>
+                                <div class="resource-info">
+                                    <h4>치주검사 기록지 양식</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type pdf">PDF</span>4페이지 · 다운로드 234
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb pdf">📄</div>
+                                <div class="resource-info">
+                                    <h4>위험요인 평가 체크시트</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type pdf">PDF</span>2페이지 · 다운로드 198
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb ppt">📊</div>
+                                <div class="resource-info">
+                                    <h4>치주질환 분류 기준</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type ppt">PPT</span>22슬라이드 · 다운로드 167
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== STEP 3: 치료계획 ========== -->
+                <div class="step-content" id="content-3">
+                    <div class="step-detail">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">💡 핵심 포인트</h3>
+                            </div>
+                            <div class="key-points">
+                                <div class="key-point">
+                                    <div class="key-point-icon">📊</div>
+                                    <div class="key-point-content">
+                                        <h4>검사 결과 시각적 설명</h4>
+                                        <p>치주차트, 방사선 사진, 구강 내 사진을 활용하여 환자가 본인의 구강 상태를 이해할 수 있도록 설명합니다.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">🎯</div>
+                                    <div class="key-point-content">
+                                        <h4>맞춤형 치료계획 수립</h4>
+                                        <p>환자의 질환 단계, 위험요인, 생활패턴을 고려한 개인 맞춤형 치료계획을 수립합니다.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">💰</div>
+                                    <div class="key-point-content">
+                                        <h4>비용 및 일정 안내</h4>
+                                        <p>예상 치료 비용, 보험 적용 범위, 치료 기간을 투명하게 안내하여 환자의 동의를 구합니다.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">✅ 치료계획 체크리스트</h3>
+                                <span class="card-link check-count">0/7 완료</span>
+                            </div>
+                            <div class="checklist">
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">검사 결과 설명 완료</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">현재 상태 시각적 자료 제시</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">치료 옵션 설명</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">예상 치료 기간 안내</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">비용 및 보험 적용 설명</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">환자 동의 확인</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">치료 동의서 서명</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">📚 관련 교육 자료</h3>
+                            <a href="#" class="card-link">전체보기 →</a>
+                        </div>
+                        <div class="resources-grid">
+                            <div class="resource-card">
+                                <div class="resource-thumb video">▶️</div>
+                                <div class="resource-info">
+                                    <h4>치료계획 상담 화법</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type video">영상</span>14:15 · 조회 189
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb pdf">📄</div>
+                                <div class="resource-info">
+                                    <h4>치료계획서 양식</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type pdf">PDF</span>3페이지 · 다운로드 145
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb ppt">📊</div>
+                                <div class="resource-info">
+                                    <h4>환자 설명용 PPT 템플릿</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type ppt">PPT</span>18슬라이드 · 다운로드 201
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb pdf">📄</div>
+                                <div class="resource-info">
+                                    <h4>치료 동의서 양식</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type pdf">PDF</span>2페이지 · 다운로드 178
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== STEP 4: 시술 ========== -->
+                <div class="step-content" id="content-4">
+                    <div class="step-detail">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">💡 핵심 포인트</h3>
+                            </div>
+                            <div class="key-points">
+                                <div class="key-point">
+                                    <div class="key-point-icon">🎨</div>
+                                    <div class="key-point-content">
+                                        <h4>바이오필름 염색</h4>
+                                        <p>시술 전 바이오필름을 염색하여 환자에게 현재 상태를 보여주고, 시술 후 개선 효과를 확인할 수 있게 합니다.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">💨</div>
+                                    <div class="key-point-content">
+                                        <h4>GBT(Guided Biofilm Therapy) 적용</h4>
+                                        <p>에어플로우를 활용한 최소 침습적 바이오필름 제거로 환자 불편감을 최소화하고 효과적인 치료를 제공합니다.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">🪥</div>
+                                    <div class="key-point-content">
+                                        <h4>구강위생교육 병행</h4>
+                                        <p>시술 중 환자에게 올바른 칫솔질 방법, 치간칫솔/치실 사용법을 교육하여 가정 관리 능력을 향상시킵니다.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">✅ 시술 체크리스트</h3>
+                                <span class="card-link check-count">0/9 완료</span>
+                            </div>
+                            <div class="checklist">
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">환자 상태 재확인</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">바이오필름 염색</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">환자 동기부여 (염색 결과 설명)</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">치은연상 에어플로우</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">치은연하 페리오플로우</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">피에조 스케일링 (필요시)</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">구강위생교육 실시</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">시술 후 주의사항 안내</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">다음 내원일 예약</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">📚 관련 교육 자료</h3>
+                            <a href="#" class="card-link">전체보기 →</a>
+                        </div>
+                        <div class="resources-grid">
+                            <div class="resource-card">
+                                <div class="resource-thumb video">▶️</div>
+                                <div class="resource-info">
+                                    <h4>GBT 8단계 프로토콜</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type video">영상</span>22:45 · 조회 456
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb video">▶️</div>
+                                <div class="resource-info">
+                                    <h4>에어플로우 실습 영상</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type video">영상</span>18:30 · 조회 378
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb pdf">📄</div>
+                                <div class="resource-info">
+                                    <h4>구강위생교육 가이드</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type pdf">PDF</span>6페이지 · 다운로드 267
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb pdf">📄</div>
+                                <div class="resource-info">
+                                    <h4>시술 후 주의사항 안내문</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type pdf">PDF</span>1페이지 · 다운로드 312
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== STEP 5: 유지관리 ========== -->
+                <div class="step-content" id="content-5">
+                    <div class="step-detail">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">💡 핵심 포인트</h3>
+                            </div>
+                            <div class="key-points">
+                                <div class="key-point">
+                                    <div class="key-point-icon">📅</div>
+                                    <div class="key-point-content">
+                                        <h4>위험도별 리콜 주기 설정</h4>
+                                        <p>저위험군 6개월, 중위험군 3~4개월, 고위험군 2~3개월로 개인별 맞춤 리콜 주기를 설정합니다.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">📞</div>
+                                    <div class="key-point-content">
+                                        <h4>체계적 리콜 관리</h4>
+                                        <p>예약 1주일 전 문자 발송, 미내원 환자 추적 관리, 리콜 성공률 모니터링을 통해 환자 유지율을 높입니다.</p>
+                                    </div>
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-icon">📈</div>
+                                    <div class="key-point-content">
+                                        <h4>경과 모니터링</h4>
+                                        <p>매 방문 시 치주 상태 변화를 기록하고, 치료 효과를 평가하여 필요시 치료계획을 수정합니다.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">✅ 유지관리 체크리스트</h3>
+                                <span class="card-link check-count">0/8 완료</span>
+                            </div>
+                            <div class="checklist">
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">리콜 주기 설정 (위험도 기반)</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">치주 상태 재평가</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">이전 기록과 비교 설명</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">유지관리 시술 실시</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">구강위생 상태 점검</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">필요시 재교육 실시</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">다음 리콜 예약</span>
+                                </div>
+                                <div class="check-item" onclick="toggleCheck(this)">
+                                    <div class="check-box"></div>
+                                    <span class="check-text">리콜 문자 발송 설정</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">📚 관련 교육 자료</h3>
+                            <a href="#" class="card-link">전체보기 →</a>
+                        </div>
+                        <div class="resources-grid">
+                            <div class="resource-card">
+                                <div class="resource-thumb video">▶️</div>
+                                <div class="resource-info">
+                                    <h4>효과적인 리콜 시스템 구축</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type video">영상</span>16:40 · 조회 234
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb pdf">📄</div>
+                                <div class="resource-info">
+                                    <h4>리콜 주기 설정 가이드</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type pdf">PDF</span>4페이지 · 다운로드 189
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb pdf">📄</div>
+                                <div class="resource-info">
+                                    <h4>리콜 문자 스크립트</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type pdf">PDF</span>2페이지 · 다운로드 276
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="resource-card">
+                                <div class="resource-thumb ppt">📊</div>
+                                <div class="resource-info">
+                                    <h4>환자 유지율 향상 전략</h4>
+                                    <div class="resource-meta">
+                                        <span class="resource-type ppt">PPT</span>20슬라이드 · 다운로드 156
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 전체 가이드 다운로드 -->
+                <div class="download-banner">
+                    <div class="download-info">
+                        <div class="download-icon">📖</div>
+                        <div class="download-text">
+                            <h4>CDHC 치주관리 프로세스 전체 매뉴얼</h4>
+                            <p>5단계 전체 프로세스 + 체크리스트 + 스크립트 포함 (PDF, 42페이지)</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary">📥 다운로드</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ==================== Firebase 초기화 ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrU3rYs4fxlMkr8r0sjo70Mt0Al-HUtyg",
+            authDomain: "apseoncare-platform.firebaseapp.com",
+            projectId: "apseoncare-platform",
+            storageBucket: "apseoncare-platform.firebasestorage.app",
+            messagingSenderId: "515333523928",
+            appId: "1:515333523928:web:e19a9db63c522d8484caad"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        console.log('🔥 Firebase 초기화 완료!');
+
+        // ==================== 로그인 상태 체크 ====================
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                console.log('로그인 필요');
+                window.location.href = 'apsencare_login_firebase.html';
+                return;
+            }
+
+            console.log('로그인됨:', user.email);
+            await loadUserInfo(user.uid);
+        });
+
+        // ==================== 사용자 정보 로드 ====================
+        async function loadUserInfo(uid) {
+            try {
+                const userDoc = await db.collection('users').doc(uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    document.getElementById('userAvatar').textContent = userData.name ? userData.name.charAt(0) : '?';
+                    document.getElementById('userName').textContent = userData.name || userData.email;
+                    document.getElementById('userRole').textContent = userData.userType === 'admin' ? '관리자' : '파트너 병원';
+                }
+            } catch (error) {
+                console.error('사용자 정보 로드 오류:', error);
+            }
+        }
+
+        // ==================== 로그아웃 ====================
+        async function handleLogout() {
+            if (confirm('로그아웃 하시겠습니까?')) {
+                try {
+                    await auth.signOut();
+                    sessionStorage.removeItem('apsencare_user');
+                    window.location.href = 'apsencare_login_firebase.html';
+                } catch (error) {
+                    console.error('로그아웃 오류:', error);
+                    alert('로그아웃 중 오류가 발생했습니다.');
+                }
+            }
+        }
+
+        // ==================== 프로세스 단계 전환 ====================
+        function selectStep(stepNum) {
+            document.querySelectorAll('.process-step').forEach((el, idx) => {
+                el.classList.toggle('active', idx === stepNum - 1);
+            });
+            
+            document.querySelectorAll('.step-tab').forEach((el, idx) => {
+                el.classList.toggle('active', idx === stepNum - 1);
+            });
+            
+            document.querySelectorAll('.step-content').forEach((el, idx) => {
+                el.classList.toggle('active', idx === stepNum - 1);
+            });
+
+            document.querySelector('.step-tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // ==================== 체크리스트 ====================
+        function toggleCheck(el) {
+            el.classList.toggle('checked');
+            const checkBox = el.querySelector('.check-box');
+            checkBox.textContent = el.classList.contains('checked') ? '✓' : '';
+            
+            const activeContent = document.querySelector('.step-content.active');
+            if (activeContent) {
+                const checkedCount = activeContent.querySelectorAll('.check-item.checked').length;
+                const totalCount = activeContent.querySelectorAll('.check-item').length;
+                const countEl = activeContent.querySelector('.check-count');
+                if (countEl) {
+                    countEl.textContent = `${checkedCount}/${totalCount} 완료`;
+                }
+            }
+        }
+
+        // 페이지 로드 시 체크리스트 카운트 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.step-content').forEach(content => {
+                const checkedCount = content.querySelectorAll('.check-item.checked').length;
+                const totalCount = content.querySelectorAll('.check-item').length;
+                const countEl = content.querySelector('.check-count');
+                if (countEl) {
+                    countEl.textContent = `${checkedCount}/${totalCount} 완료`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

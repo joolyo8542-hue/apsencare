@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>앞선케어 - 성과 분석</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            background: #f9fafb;
+            color: #1a1a1a;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .app-layout { display: flex; min-height: 100vh; }
+
+        /* 사이드바 */
+        .sidebar {
+            width: 260px; background: white; border-right: 1px solid #e5e7eb;
+            display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100;
+        }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #e5e7eb; }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo-circle { width: 40px; height: 40px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 2px solid #ec4899; }
+        .logo-text-group { text-align: left; }
+        .logo-main { font-size: 18px; font-weight: 700; color: #1f2937; }
+        .logo-sub { font-size: 9px; color: #ec4899; font-weight: 600; text-transform: uppercase; }
+        .sidebar-nav { flex: 1; padding: 16px 0; overflow-y: auto; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #4b5563; text-decoration: none; font-size: 14px; transition: all 0.2s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #fdf2f8; color: #ec4899; }
+        .nav-item.active { background: #fdf2f8; color: #ec4899; border-left-color: #ec4899; font-weight: 600; }
+        .nav-icon { width: 20px; text-align: center; font-size: 16px; }
+        .nav-label { flex: 1; }
+        .nav-badge { background: #10b981; color: white; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+        .nav-divider { height: 1px; background: #e5e7eb; margin: 12px 20px; }
+        .sidebar-footer { padding: 16px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; }
+        .user-card { display: flex; align-items: center; gap: 12px; }
+        .user-avatar { width: 36px; height: 36px; background: linear-gradient(135deg, #f472b6, #ec4899); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 600; }
+        .user-info { flex: 1; }
+        .user-name { font-size: 13px; font-weight: 600; color: #1f2937; }
+        .user-role { font-size: 11px; color: #6b7280; }
+        .logout-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: #6b7280; padding: 4px; }
+        .logout-btn:hover { color: #ef4444; }
+
+        /* 메인 콘텐츠 */
+        .main-content { flex: 1; margin-left: 260px; padding: 24px; }
+        .page-header { margin-bottom: 24px; }
+        .page-title { font-size: 24px; font-weight: 700; color: #1f2937; margin-bottom: 4px; }
+        .page-desc { color: #6b7280; font-size: 14px; }
+
+        /* 메인 탭 */
+        .main-tabs { display: flex; gap: 8px; margin-bottom: 24px; background: white; padding: 8px; border-radius: 12px; border: 1px solid #e5e7eb; }
+        .main-tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; color: #6b7280; }
+        .main-tab:hover { color: #ec4899; background: #fdf2f8; }
+        .main-tab.active { background: linear-gradient(135deg, #f472b6, #ec4899); color: white; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ⚠️ 업로드 체크리스트 */
+        .upload-checklist {
+            background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px;
+            padding: 20px; margin-bottom: 20px; text-align: left;
+        }
+        .upload-checklist.complete { background: #dcfce7; border-color: #16a34a; }
+        .upload-checklist-title { color: #92400e; font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+        .upload-checklist.complete .upload-checklist-title { color: #166534; }
+        .checklist-item { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(245, 158, 11, 0.3); }
+        .upload-checklist.complete .checklist-item { border-bottom-color: rgba(22, 163, 74, 0.3); }
+        .checklist-item:last-child { border-bottom: none; }
+        .checklist-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: #16a34a; cursor: pointer; margin-top: 2px; flex-shrink: 0; }
+        .checklist-item label { color: #78350f; font-size: 14px; cursor: pointer; flex: 1; line-height: 1.5; }
+        .upload-checklist.complete .checklist-item label { color: #166534; }
+        .checklist-item .warning-icon { color: #dc2626; font-weight: bold; }
+        .checklist-help { margin-top: 12px; padding: 12px; background: white; border-radius: 8px; font-size: 13px; color: #78350f; line-height: 1.7; }
+        .upload-checklist.complete .checklist-help { color: #166534; }
+
+        /* 체크리스트 카테고리 구분 */
+        .checklist-category {
+            font-size: 13px; font-weight: 700; color: #b45309; margin-top: 14px; margin-bottom: 6px;
+            padding: 6px 12px; background: rgba(245, 158, 11, 0.15); border-radius: 6px; display: inline-block;
+        }
+        .upload-checklist.complete .checklist-category { color: #15803d; background: rgba(22, 163, 74, 0.15); }
+
+        /* 업로드 설명 */
+        .upload-description {
+            background: white; border: 1px solid #e5e7eb; border-radius: 12px;
+            padding: 20px; margin-bottom: 20px; font-size: 14px; line-height: 1.8;
+        }
+
+        /* 업로드 버튼 */
+        .upload-button {
+            width: 100%; padding: 16px; background: linear-gradient(135deg, #f472b6, #ec4899);
+            color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .upload-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(236, 72, 153, 0.3); }
+        .upload-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* 분석 결과 배너 */
+        .analysis-banner {
+            background: linear-gradient(135deg, #ec4899, #be185d); color: white;
+            padding: 16px 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;
+        }
+        .analysis-banner h2 { margin: 0; font-size: 18px; }
+        .analysis-banner p { margin: 8px 0 0 0; opacity: 0.9; font-size: 14px; }
+
+        /* KPI 카드 */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
+        .kpi-card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; text-align: center; }
+        .kpi-value { font-size: 28px; font-weight: 700; color: #1f2937; margin-bottom: 4px; }
+        .kpi-label { color: #6b7280; font-size: 13px; margin-bottom: 4px; }
+        .kpi-change { font-size: 11px; }
+        .kpi-change.up { color: #10b981; }
+        .kpi-change.down { color: #ef4444; }
+
+        /* 5개 KPI 그리드 */
+        .kpi-grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+
+        /* 차트 섹션 */
+        .chart-section { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .chart-title { color: #1f2937; margin: 0; font-size: 16px; }
+        .chart-subtitle { color: #6b7280; font-size: 12px; margin-top: 4px; }
+        .filter-btn { padding: 6px 12px; background: #f3f4f6; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; margin-left: 8px; }
+        .filter-btn.active { background: #ec4899; color: white; }
+
+        /* 차트 그리드 */
+        .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px; }
+        .charts-row-equal { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+        .donut-wrapper { position: relative; height: 200px; display: flex; align-items: center; justify-content: center; }
+        .donut-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+        .donut-center-label { font-size: 12px; color: #6b7280; }
+        .donut-center-value { font-size: 24px; font-weight: 700; color: #ec4899; }
+        .donut-center-sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
+        .donut-center-sub-value { font-size: 14px; color: #374151; }
+
+        /* 테이블 */
+        .data-table-section { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th { padding: 12px 8px; text-align: left; color: #374151; font-size: 13px; border-bottom: 1px solid #e5e7eb; background: #f9fafb; white-space: nowrap; }
+        .data-table td { padding: 12px 8px; border-bottom: 1px solid #f3f4f6; font-size: 13px; white-space: nowrap; }
+        .data-table tr:hover { background: #fdf2f8; }
+        .data-table-wrapper { overflow-x: auto; }
+
+        .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .status-excellent { background: #d1fae5; color: #065f46; }
+        .status-good { background: #dbeafe; color: #1e40af; }
+        .status-average { background: #fef3c7; color: #92400e; }
+        .status-below { background: #fee2e2; color: #991b1b; }
+        .status-warning { background: #fee2e2; color: #991b1b; }
+
+        /* 분석 결과 영역 */
+        .analysis-result { display: none; }
+        .analysis-result.show { display: block; }
+
+        /* 파일 목록 */
+        .file-list { margin: 16px 0; }
+        .file-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f3f4f6; border-radius: 6px; margin-bottom: 8px; font-size: 13px; }
+        .file-item .remove-btn { margin-left: auto; background: none; border: none; color: #ef4444; cursor: pointer; }
+
+        /* 서브탭 */
+        .sub-tabs { display: flex; gap: 4px; margin-bottom: 20px; background: #f3f4f6; padding: 4px; border-radius: 10px; }
+        .sub-tab { flex: 1; padding: 10px 16px; border: none; background: transparent; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; color: #6b7280; transition: all 0.2s; }
+        .sub-tab:hover { color: #ec4899; }
+        .sub-tab.active { background: white; color: #ec4899; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .sub-content { display: none; }
+        .sub-content.active { display: block; animation: fadeIn 0.3s ease; }
+
+        /* 인사이트 박스 */
+        .insight-box {
+            background: linear-gradient(135deg, #fdf2f8, #fce7f3); border: 1px solid #f9a8d4;
+            border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;
+        }
+        .insight-box .insight-title { font-weight: 700; color: #be185d; margin-bottom: 8px; font-size: 14px; }
+        .insight-box .insight-text { color: #9d174d; font-size: 13px; line-height: 1.7; white-space: pre-line; }
+
+        /* 로딩 & 토스트 */
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; opacity: 0; visibility: hidden; transition: all 0.3s; }
+        .loading-overlay.show { opacity: 1; visibility: visible; }
+        .loading-spinner { width: 48px; height: 48px; border: 4px solid #fce7f3; border-top-color: #ec4899; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: #6b7280; font-size: 14px; }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 14px 28px; border-radius: 10px; font-size: 14px; font-weight: 500; z-index: 9999; opacity: 0; transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { background: #10b981; color: white; }
+        .toast.error { background: #ef4444; color: white; }
+
+        /* 반응형 */
+        @media (max-width: 1200px) {
+            .kpi-grid, .kpi-grid-5 { grid-template-columns: repeat(2, 1fr); }
+            .charts-row, .charts-row-equal { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .sidebar { width: 60px; }
+            .logo-text-group, .nav-label, .nav-badge, .user-info { display: none; }
+            .nav-item { justify-content: center; padding: 14px; }
+            .main-content { margin-left: 60px; }
+            .kpi-grid, .kpi-grid-5 { grid-template-columns: 1fr; }
+            .main-tabs { flex-direction: column; }
+            .sub-tabs { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">데이터 분석 중...</div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <div class="app-layout">
+        <!-- 사이드바 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-circle">🦷</div>
+                    <div class="logo-text-group">
+                        <div class="logo-main">앞선케어</div>
+                        <div class="logo-sub">Dental Care Analytics</div>
+                    </div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a class="nav-item" href="apsencare_hospital_home_firebase.html"><span class="nav-icon">🏠</span><span class="nav-label">홈</span></a>
+                <a class="nav-item" href="#"><span class="nav-icon">📖</span><span class="nav-label">앞선케어 소개</span></a>
+                <a class="nav-item" href="apsencare_process_full.html"><span class="nav-icon">🦷</span><span class="nav-label">치주관리 프로세스</span></a>
+                <a class="nav-item active" href="apsencare_analytics_full.html"><span class="nav-icon">📊</span><span class="nav-label">성과 분석</span><span class="nav-badge">NEW</span></a>
+                <div class="nav-divider"></div>
+                <a class="nav-item" href="#"><span class="nav-icon">🔔</span><span class="nav-label">리콜시스템</span></a>
+                <a class="nav-item" href="#"><span class="nav-icon">📚</span><span class="nav-label">임상교육자과정</span></a>
+                <div class="nav-divider"></div>
+                <a class="nav-item" href="#"><span class="nav-icon">⚙️</span><span class="nav-label">설정</span></a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar" id="userAvatar">-</div>
+                    <div class="user-info">
+                        <div class="user-name" id="userName">로딩 중...</div>
+                        <div class="user-role" id="userRole">-</div>
+                    </div>
+                    <button class="logout-btn" onclick="handleLogout()" title="로그아웃">🚪</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 메인 콘텐츠 -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">📊 성과 분석</h1>
+                <p class="page-desc">병원 수납액 성장률과 환자 유지율을 분석합니다</p>
+            </div>
+
+            <div class="main-tabs">
+                <button class="main-tab active" onclick="switchMainTab('growth')">💰 수납액 성장률</button>
+                <button class="main-tab" onclick="switchMainTab('retention')">👥 유지율 / 이탈율</button>
+            </div>
+
+            <!-- ==================== 수납액 성장률 탭 ==================== -->
+            <div class="tab-content active" id="growth-tab">
+                
+                <!-- 📂 덴트웹 추출 경로 안내 -->
+                <div style="margin-bottom: 20px; padding: 20px; background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%); border: 2px solid #93c5fd; border-radius: 12px;">
+                    <div style="font-weight: 700; color: #1e40af; margin-bottom: 12px; font-size: 15px;">📂 데이터 추출 경로 (덴트웹)</div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; background: white; border-radius: 10px; border: 1px solid #bfdbfe;">
+                        <span style="background: #dbeafe; color: #1e40af; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;">경영/통계</span>
+                        <span style="color: #93c5fd; font-weight: 700;">→</span>
+                        <span style="background: #dbeafe; color: #1e40af; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;">의사별 수납액 통계</span>
+                        <span style="color: #93c5fd; font-weight: 700;">→</span>
+                        <span style="background: #dcfce7; color: #166534; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;">해당 의사 선택</span>
+                        <span style="color: #93c5fd; font-weight: 700;">→</span>
+                        <span style="background: #fef3c7; color: #92400e; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;">📥 엑셀 저장</span>
+                        <span style="color: #93c5fd; font-weight: 700;">→</span>
+                        <span style="background: #fce7f3; color: #9d174d; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 13px;">💾 월간 자료 저장</span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px; color: #6b7280; line-height: 1.6;">
+                        💡 예시: <strong>구강관리팀 → 가상의사</strong> 설정 후 월별로 엑셀 저장<br>
+                        ⚠️ 저장한 파일을 <strong>아래 안내에 따라 반드시 정제(열 삭제)</strong>한 후 업로드해주세요
+                    </div>
+                </div>
+
+                <!-- ✂️ 엑셀 열 정제 안내 -->
+                <div style="margin-bottom: 20px; padding: 20px; background: #fff; border: 2px solid #16a34a; border-radius: 12px;">
+                    <div style="font-weight: 700; color: #166534; margin-bottom: 14px; font-size: 15px;">✅ 업로드 전 엑셀 열 정제 안내</div>
+                    <div style="font-size: 13px; color: #6b7280; margin-bottom: 14px; line-height: 1.6;">
+                        덴트웹에서 추출한 파일에서 <strong style="color: #16a34a;">아래 5개 열만 남기고</strong> 나머지 열은 모두 삭제해주세요.
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; border-radius: 8px; overflow: hidden;">
+                        <thead>
+                            <tr style="background: #f0fdf4;">
+                                <th style="padding: 10px 12px; text-align: left; border-bottom: 2px solid #bbf7d0; color: #166534;">유지할 열</th>
+                                <th style="padding: 10px 12px; text-align: left; border-bottom: 2px solid #bbf7d0; color: #166534;">용도</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="background: #f0fdf4;">
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; font-weight: 600; color: #1f2937;">진료일</td>
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; color: #6b7280;">내원건수 집계 <span style="font-size:11px;">(분석 후 즉시 삭제)</span></td>
+                            </tr>
+                            <tr style="background: #f0fdf4;">
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; font-weight: 600; color: #1f2937;">차트번호</td>
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; color: #6b7280;">내원건수 집계 <span style="font-size:11px;">(분석 후 즉시 삭제)</span></td>
+                            </tr>
+                            <tr style="background: #f0fdf4;">
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; font-weight: 600; color: #1f2937;">수납구분</td>
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; color: #6b7280;">보험본인부담 / 비급여 분류</td>
+                            </tr>
+                            <tr style="background: #f0fdf4;">
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; font-weight: 600; color: #1f2937;">진료금액</td>
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; color: #6b7280;">금액 합산</td>
+                            </tr>
+                            <tr style="background: #f0fdf4;">
+                                <td style="padding: 10px 12px; font-weight: 600; color: #1f2937;">총수납액</td>
+                                <td style="padding: 10px 12px; color: #6b7280;">미수/환불 차이 분석</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 12px; padding: 10px 14px; background: #fef2f2; border-radius: 8px; font-size: 12px; color: #991b1b; line-height: 1.6;">
+                        🗑 <strong>위 5개 열 외 나머지는 모두 삭제</strong> (순번, 수납일, 보험구분, 최초내원, 고객구분2 등)<br>
+                        📌 파일명은 <strong>기간이 포함된 원본 파일명을 그대로 유지</strong>해주세요 (날짜 자동 인식)
+                    </div>
+                </div>
+
+                <!-- 🔒 보안 & 개인정보 체크리스트 -->
+                <div class="upload-checklist" id="growthChecklist">
+                    <div class="upload-checklist-title">🔒 업로드 전 보안 & 개인정보 필수 확인사항</div>
+                    
+                    <div class="checklist-category">✂️ 열 정제 확인</div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="gCheck1" onchange="updateGrowthChecklist()">
+                        <label for="gCheck1"><span class="warning-icon">❌</span> <strong>진료일, 차트번호, 수납구분, 진료금액, 총수납액</strong> 5개 열만 남기고 <strong>나머지는 모두 삭제</strong>했습니다</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="gCheck2" onchange="updateGrowthChecklist()">
+                        <label for="gCheck2"><span class="warning-icon">❌</span> 진료일·차트번호는 내원건수 집계에만 사용되며, <strong>분석 후 즉시 메모리에서 삭제</strong>됨을 이해합니다</label>
+                    </div>
+
+                    <div class="checklist-category">📋 개인정보 미포함 확인</div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="gCheck3" onchange="updateGrowthChecklist()">
+                        <label for="gCheck3"><span class="warning-icon">❌</span> 환자 <strong>이름, 주민등록번호, 전화번호, 주소</strong> 등 개인 식별정보가 포함되어 있지 않습니다</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="gCheck4" onchange="updateGrowthChecklist()">
+                        <label for="gCheck4"><span class="warning-icon">❌</span> <strong>진단명, 처방, 처치코드, 보험 청구 상세내역</strong>(EDI 코드 등)이 포함되어 있지 않습니다</label>
+                    </div>
+
+                    <div class="checklist-category">🏥 의료기관 보안 확인</div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="gCheck5" onchange="updateGrowthChecklist()">
+                        <label for="gCheck5"><span class="warning-icon">❌</span> <strong>원장/관리자 승인</strong> 하에 데이터를 업로드하며, 내부 데이터 유출에 주의합니다</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="gCheck6" onchange="updateGrowthChecklist()">
+                        <label for="gCheck6"><span class="warning-icon">❌</span> 업로드 데이터는 <strong>브라우저 내에서만 분석</strong>되며, 외부 서버로 전송되지 않음을 확인합니다</label>
+                    </div>
+
+                    <div class="checklist-help">
+                        ✅ <strong>정제 후 허용 데이터:</strong> 진료일(내원건수 집계), 차트번호(내원건수 집계), 수납구분(보험/비급여 분류), 진료금액(금액 합산), 총수납액(미수/환불 분석) <strong>5개 열만</strong><br>
+                        🛡️ <strong>안전 보장:</strong> 모든 분석은 브라우저(클라이언트) 내에서 처리되며, 파일이 서버에 업로드되거나 저장되지 않습니다<br>
+                        ⚖️ <strong>법적 근거:</strong> 개인정보보호법 제17조, 의료법 제21조에 의거 환자 식별정보는 반드시 제거 후 업로드해야 합니다
+                    </div>
+                </div>
+
+                <!-- 의료기관 유형 선택 -->
+                <div id="facilityTypeSelector" style="margin-top: 20px; padding: 20px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px;">
+                    <div style="font-weight: 700; color: #1f2937; margin-bottom: 12px; font-size: 15px;">🏥 의료기관 유형 선택</div>
+                    <div style="display: flex; gap: 12px;">
+                        <label id="facilityHospital" style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: white; border: 2px solid #ec4899; border-radius: 10px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="facilityType" value="hospital" checked onchange="updateFacilityType()" style="accent-color: #ec4899; width: 18px; height: 18px;">
+                            <div>
+                                <div style="font-weight: 700; color: #1f2937; font-size: 14px;">🏥 병원</div>
+                                <div style="color: #6b7280; font-size: 12px; margin-top: 2px;">본인부담 <strong style="color:#ec4899;">40%</strong> · 공단부담 60%</div>
+                            </div>
+                        </label>
+                        <label id="facilityClinic" style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: white; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; transition: all 0.2s;">
+                            <input type="radio" name="facilityType" value="clinic" onchange="updateFacilityType()" style="accent-color: #ec4899; width: 18px; height: 18px;">
+                            <div>
+                                <div style="font-weight: 700; color: #1f2937; font-size: 14px;">🏨 의원</div>
+                                <div style="color: #6b7280; font-size: 12px; margin-top: 2px;">본인부담 <strong style="color:#6366f1;">30%</strong> · 공단부담 70%</div>
+                            </div>
+                        </label>
+                    </div>
+                    <div id="facilityDesc" style="margin-top: 10px; padding: 8px 12px; background: #fdf2f8; border-radius: 8px; font-size: 12px; color: #9d174d;">
+                        💡 공단부담금 = 본인부담금 ÷ 0.4 × 0.6 으로 추산됩니다
+                    </div>
+                </div>
+
+                <!-- 업로드 설명 -->
+                <div class="upload-description">
+                    <strong>📊 정제된 월별 수납통계 Excel 파일을 업로드하세요</strong> <span style="color:#6366f1; font-weight:600;">(여러 파일 동시 선택 가능)</span><br><br>
+                    • 파일명은 원본 그대로 유지: <span style="color: #059669; font-weight: 600;">2024-01-01_2024-01-31수납통계.xlsx</span> (기간 자동 인식)<br>
+                    • 유지 열 5개: <strong style="color:#16a34a;">진료일, 차트번호, 수납구분, 진료금액, 총수납액</strong> — 나머지는 모두 삭제<br>
+                    • 공단부담금은 위에서 선택한 <strong>의료기관 유형 비율</strong>로 자동 추산됩니다<br>
+                    • <span style="color: #dc2626; font-weight: 600;">최소 2개월</span> 이상의 파일을 업로드해야 추이 분석이 가능합니다
+                </div>
+
+                <!-- 업로드 버튼 -->
+                <button class="upload-button" id="growthUploadBtn" disabled>🔒 보안 체크리스트를 먼저 확인해주세요</button>
+                <input type="file" id="growthFileInput" accept=".xlsx,.xls" multiple style="display: none;">
+
+                <!-- 업로드된 파일 -->
+                <div id="growthUploadedFiles" style="margin-top: 16px; display: none;">
+                    <h4 style="color: #1f2937; margin-bottom: 8px; font-size: 14px;">📁 업로드된 파일</h4>
+                    <div id="growthFileList" class="file-list"></div>
+                    <button id="growthAnalyzeBtn" style="background: #ec4899; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 8px;">
+                        🔍 수납액 분석 시작
+                    </button>
+                </div>
+
+                <!-- ========== 분석 결과 ========== -->
+                <div class="analysis-result" id="growthResults">
+                    
+                    <!-- 배너 -->
+                    <div class="analysis-banner">
+                        <h2>💰 수납액 성장률 분석 완료!</h2>
+                        <p id="growthBannerDesc">월별 수납 추이와 성장률을 확인하세요</p>
+                    </div>
+
+                    <!-- KPI 카드 5개 -->
+                    <div class="kpi-grid-5">
+                        <div class="kpi-card">
+                            <div class="kpi-value" id="kpiTotalRevenue">-</div>
+                            <div class="kpi-label">최근 월 총수납</div>
+                            <div class="kpi-change" id="kpiTotalRevenueChange"></div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value" id="kpiYoyGrowth">-</div>
+                            <div class="kpi-label">YoY 수납 성장률</div>
+                            <div class="kpi-change" id="kpiYoyGrowthChange"></div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value" id="kpiNonInsRatio">-</div>
+                            <div class="kpi-label">비급여 비율</div>
+                            <div class="kpi-change" id="kpiNonInsRatioChange"></div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value" id="kpiPerPatient">-</div>
+                            <div class="kpi-label">객단가</div>
+                            <div class="kpi-change" id="kpiPerPatientChange"></div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-value" id="kpiPatientCount">-</div>
+                            <div class="kpi-label">최근 월 내원건수</div>
+                            <div class="kpi-change" id="kpiPatientCountChange"></div>
+                        </div>
+                    </div>
+
+                    <!-- 서브탭 -->
+                    <div class="sub-tabs">
+                        <button class="sub-tab active" onclick="switchGrowthSub('trend')">📈 금액 추이</button>
+                        <button class="sub-tab" onclick="switchGrowthSub('yoy')">📅 YoY 동월 비교</button>
+                        <button class="sub-tab" onclick="switchGrowthSub('unit')">💎 객단가 & 비급여</button>
+                    </div>
+
+                    <!-- 서브탭 1: 금액 추이 -->
+                    <div class="sub-content active" id="trend-sub">
+                        <div class="chart-section">
+                            <div class="chart-header">
+                                <div>
+                                    <h3 class="chart-title">📊 월별 수납 구성 추이</h3>
+                                    <p class="chart-subtitle">보험 수납(본인부담) + 비급여 수납</p>
+                                </div>
+                            </div>
+                            <div style="height: 350px;"><canvas id="revenueStackedChart"></canvas></div>
+                        </div>
+
+                        <div class="charts-row-equal">
+                            <div class="chart-section">
+                                <h3 class="chart-title">📊 항목별 금액 비교</h3>
+                                <p class="chart-subtitle">본인부담금 · 공단부담금 · 비급여</p>
+                                <div style="height: 300px; margin-top: 12px;"><canvas id="revenueLineChart"></canvas></div>
+                            </div>
+                            <div class="chart-section">
+                                <h3 class="chart-title">📊 총진료비 추이</h3>
+                                <p class="chart-subtitle">총진료비 = (본인부담 + 공단부담) + 비급여</p>
+                                <div style="height: 300px; margin-top: 12px;"><canvas id="totalFeeChart"></canvas></div>
+                            </div>
+                        </div>
+
+                        <!-- 데이터 테이블 -->
+                        <div class="data-table-section">
+                            <h3 class="chart-title" style="margin-bottom: 16px;">📋 월별 상세 데이터</h3>
+                            <div class="data-table-wrapper">
+                                <table class="data-table" id="growthDataTable">
+                                    <thead>
+                                        <tr>
+                                            <th>월</th>
+                                            <th style="text-align:right;">본인부담금</th>
+                                            <th style="text-align:right;" id="nhisColumnHeader">공단부담금<span style="color:#6366f1;font-size:10px;"> (추정)</span></th>
+                                            <th style="text-align:right;">비급여</th>
+                                            <th style="text-align:right;">총진료비</th>
+                                            <th style="text-align:right;">내원건수</th>
+                                            <th style="text-align:right;">수납합계</th>
+                                            <th style="text-align:right;">객단가</th>
+                                            <th style="text-align:center;">비급여비율</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="growthTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 서브탭 2: 연도별 비교 -->
+                    <div class="sub-content" id="yoy-sub">
+                        <div style="padding: 16px 20px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; margin-bottom: 20px;">
+                            <div style="font-weight: 700; color: #1f2937; margin-bottom: 10px; font-size: 14px;">📅 비교할 연도 선택</div>
+                            <div id="yearSelectorBox" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                            <div style="margin-top: 8px; font-size: 11px; color: #6b7280;">동일 월(1~12월)을 X축으로 선택한 연도들을 겹쳐 비교합니다</div>
+                        </div>
+
+                        <div class="charts-row-equal">
+                            <div class="chart-section">
+                                <h3 class="chart-title">💰 수납합계 비교</h3>
+                                <p class="chart-subtitle">본인부담 + 비급여</p>
+                                <div style="height: 300px; margin-top: 12px;"><canvas id="yrCmpSunapChart"></canvas></div>
+                            </div>
+                            <div class="chart-section">
+                                <h3 class="chart-title">🏥 내원건수 비교</h3>
+                                <p class="chart-subtitle">차트번호+진료일 기준</p>
+                                <div style="height: 300px; margin-top: 12px;"><canvas id="yrCmpPatientChart"></canvas></div>
+                            </div>
+                        </div>
+
+                        <div class="charts-row-equal">
+                            <div class="chart-section">
+                                <h3 class="chart-title">💎 객단가 비교</h3>
+                                <p class="chart-subtitle">총진료비 ÷ 내원건수</p>
+                                <div style="height: 300px; margin-top: 12px;"><canvas id="yrCmpUnitChart"></canvas></div>
+                            </div>
+                            <div class="chart-section">
+                                <h3 class="chart-title">🧡 비급여비율 비교</h3>
+                                <p class="chart-subtitle">비급여 ÷ 총진료비 × 100 · <span style="color:#16a34a; font-weight:600;">목표 30%</span></p>
+                                <div style="height: 300px; margin-top: 12px;"><canvas id="yrCmpRatioChart"></canvas></div>
+                            </div>
+                        </div>
+
+                        <!-- 연도별 비교 테이블 -->
+                        <div class="data-table-section">
+                            <h3 class="chart-title" style="margin-bottom: 16px;">📋 연도별 월간 비교표</h3>
+                            <div class="data-table-wrapper">
+                                <table class="data-table" id="yrCmpTable">
+                                    <thead id="yrCmpTableHead"></thead>
+                                    <tbody id="yrCmpTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 서브탭 3: 객단가 & 비급여 -->
+                    <div class="sub-content" id="unit-sub">
+                        <div class="charts-row-equal">
+                            <div class="chart-section">
+                                <h3 class="chart-title">💎 객단가 추이</h3>
+                                <p class="chart-subtitle">총진료비 ÷ 내원건수 (차트번호+진료일 기준)</p>
+                                <div style="height: 300px; margin-top: 12px;"><canvas id="perPatientChart"></canvas></div>
+                            </div>
+                            <div class="chart-section">
+                                <h3 class="chart-title">🔥 비급여 비율 추이</h3>
+                                <p class="chart-subtitle">비급여 ÷ 총진료비 × 100 · <span style="color:#16a34a; font-weight:600;">목표 30% 이상</span></p>
+                                <div style="height: 300px; margin-top: 12px;"><canvas id="nonInsRatioChart"></canvas></div>
+                            </div>
+                        </div>
+
+                        <div class="chart-section">
+                            <div class="chart-header">
+                                <div>
+                                    <h3 class="chart-title">📊 내원건수 vs 객단가</h3>
+                                    <p class="chart-subtitle">성장 원인 분해: 환자 증가 vs 단가 상승</p>
+                                </div>
+                            </div>
+                            <div style="height: 350px;"><canvas id="volumePriceChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 유지율/이탈율 탭 ==================== -->
+            <div class="tab-content" id="retention-tab">
+
+                <!-- 📂 덴트웹 데이터 추출 경로 -->
+                <div style="margin-bottom: 20px; padding: 20px; background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%); border: 2px solid #93c5fd; border-radius: 12px;">
+                    <div style="font-weight: 700; color: #1e40af; margin-bottom: 12px; font-size: 15px;">📂 데이터 추출 경로 (덴트웹)</div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; background: white; border-radius: 10px; border: 1px solid #bfdbfe;">
+                        <span style="background: #dbeafe; color: #1e40af; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;">경영/통계</span>
+                        <span style="color: #93c5fd; font-weight: 700;">→</span>
+                        <span style="background: #dbeafe; color: #1e40af; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;">환자 관련 통계</span>
+                        <span style="color: #93c5fd; font-weight: 700;">→</span>
+                        <span style="background: #dbeafe; color: #1e40af; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;">접수환자 수</span>
+                        <span style="color: #93c5fd; font-weight: 700;">→</span>
+                        <span style="background: #dcfce7; color: #166534; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;">🖱️ 휠 클릭</span>
+                        <span style="color: #93c5fd; font-weight: 700;">→</span>
+                        <span style="background: #fef3c7; color: #92400e; padding: 5px 12px; border-radius: 6px; font-weight: 600; font-size: 13px;">기간별 접수환자 목록</span>
+                        <span style="color: #93c5fd; font-weight: 700;">→</span>
+                        <span style="background: #fce7f3; color: #9d174d; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 13px;">💾 연간 자료 저장</span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px; color: #6b7280; line-height: 1.6;">
+                        💡 연도별로 각각 저장하거나, 여러 연도를 하나의 파일로 저장해도 됩니다 · 최소 <strong>2개 연도 이상</strong> 필요<br>
+                        ⚠️ 저장한 파일을 <strong>아래 안내에 따라 반드시 정제(열 삭제)</strong>한 후 업로드해주세요
+                    </div>
+                </div>
+
+                <!-- ✅ 엑셀 열 정제 안내 -->
+                <div style="margin-bottom: 20px; padding: 20px; background: #fff; border: 2px solid #16a34a; border-radius: 12px;">
+                    <div style="font-weight: 700; color: #166534; margin-bottom: 14px; font-size: 15px;">✅ 업로드 전 엑셀 열 정제 안내</div>
+                    <div style="font-size: 13px; color: #6b7280; margin-bottom: 14px; line-height: 1.6;">
+                        추출한 파일에서 <strong style="color: #16a34a;">아래 2개 열만 남기고</strong> 나머지 열은 모두 삭제해주세요.
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; border-radius: 8px; overflow: hidden;">
+                        <thead>
+                            <tr style="background: #f0fdf4;">
+                                <th style="padding: 10px 12px; text-align: left; border-bottom: 2px solid #bbf7d0; color: #166534;">유지할 열</th>
+                                <th style="padding: 10px 12px; text-align: left; border-bottom: 2px solid #bbf7d0; color: #166534;">용도</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="background: #f0fdf4;">
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; font-weight: 600; color: #1f2937;">차트번호</td>
+                                <td style="padding: 10px 12px; border-bottom: 1px solid #bbf7d0; color: #6b7280;">환자 식별 — 연도별 내원 추적 <span style="font-size:11px;">(분석 후 즉시 삭제)</span></td>
+                            </tr>
+                            <tr style="background: #f0fdf4;">
+                                <td style="padding: 10px 12px; font-weight: 600; color: #1f2937;">진료일 <span style="font-weight:400; color:#6b7280;">또는</span> 접수시각</td>
+                                <td style="padding: 10px 12px; color: #6b7280;">연도 추출 — 어느 해에 내원했는지 판별 <span style="font-size:11px;">(분석 후 즉시 삭제)</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 12px; padding: 10px 14px; background: #fef2f2; border-radius: 8px; font-size: 12px; color: #991b1b; line-height: 1.6;">
+                        🗑 <strong>위 2개 열 외 나머지는 모두 삭제</strong> (순번, 수납일, 이름, 보험구분, 수납구분, 수입집계, 수납자, 진료금액, 총수납, 최초내원일, 내원경로, 리콜구분, 고객구분 등)<br>
+                        ⚠️ 특히 <strong style="color:#dc2626;">이름</strong>은 개인정보이므로 반드시 삭제해주세요
+                    </div>
+                </div>
+
+                <!-- 🔒 보안 & 개인정보 체크리스트 -->
+                <div class="upload-checklist" id="uploadChecklist">
+                    <div class="upload-checklist-title">🔒 업로드 전 보안 & 개인정보 필수 확인사항</div>
+                    
+                    <div class="checklist-category">✂️ 열 정제 확인</div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check1" onchange="updateChecklist()">
+                        <label for="check1"><span class="warning-icon">❌</span> <strong>차트번호</strong>와 <strong>날짜 열</strong>(진료일 또는 접수시각) 2개만 남기고 <strong>나머지는 모두 삭제</strong>했습니다</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check2" onchange="updateChecklist()">
+                        <label for="check2"><span class="warning-icon">❌</span> 차트번호·날짜 열은 유지/이탈 분석에만 사용되며, <strong>분석 후 즉시 메모리에서 삭제</strong>됨을 이해합니다</label>
+                    </div>
+
+                    <div class="checklist-category">📋 개인정보 미포함 확인</div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check3" onchange="updateChecklist()">
+                        <label for="check3"><span class="warning-icon">❌</span> 환자 <strong>이름, 주민등록번호, 전화번호, 주소</strong> 등 개인 식별정보가 포함되어 있지 않습니다</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check4" onchange="updateChecklist()">
+                        <label for="check4"><span class="warning-icon">❌</span> <strong>진단명, 처방, 처치코드, 보험 청구 상세내역</strong>(EDI 코드 등)이 포함되어 있지 않습니다</label>
+                    </div>
+
+                    <div class="checklist-category">🏥 의료기관 보안 확인</div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check5" onchange="updateChecklist()">
+                        <label for="check5"><span class="warning-icon">❌</span> <strong>원장/관리자 승인</strong> 하에 데이터를 업로드하며, 내부 데이터 유출에 주의합니다</label>
+                    </div>
+                    <div class="checklist-item">
+                        <input type="checkbox" id="check6" onchange="updateChecklist()">
+                        <label for="check6"><span class="warning-icon">❌</span> 업로드 데이터는 <strong>브라우저 내에서만 분석</strong>되며, 외부 서버로 전송되지 않음을 확인합니다</label>
+                    </div>
+
+                    <div class="checklist-help">
+                        ✅ <strong>정제 후 허용 데이터:</strong> 차트번호(환자 식별) + 날짜 열(진료일 또는 접수시각) <strong>2개 열만</strong><br>
+                        🛡️ <strong>안전 보장:</strong> 모든 분석은 브라우저(클라이언트) 내에서 처리되며, 파일이 서버에 업로드되거나 저장되지 않습니다<br>
+                        ⚖️ <strong>법적 근거:</strong> 개인정보보호법 제17조, 의료법 제21조에 의거 환자 식별정보는 반드시 제거 후 업로드해야 합니다
+                    </div>
+                </div>
+
+                <div class="upload-description">
+                    <strong>🎯 연도별 접수환자 목록 파일을 업로드하세요</strong><br>
+                    • 유지 열 2개: <strong style="color:#16a34a;">차트번호</strong> + <strong style="color:#16a34a;">날짜 열</strong>(진료일 또는 접수시각) — 나머지는 모두 삭제<br>
+                    • 최소 <strong>2개 연도 이상</strong> 데이터가 있어야 전년도 대비 분석이 가능합니다<br>
+                    • 파일명은 자유 — 시스템이 Excel 내용을 자동 분석합니다
+                </div>
+
+                <button class="upload-button" id="uploadBtn" disabled>🔒 체크리스트를 먼저 확인해주세요</button>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display: none;">
+
+                <div id="uploadedFiles" style="margin-top: 16px; display: none;">
+                    <h4 style="color: #1f2937; margin-bottom: 8px; font-size: 14px;">📁 업로드된 파일들</h4>
+                    <div id="fileList" class="file-list"></div>
+                    <button id="analyzeBtn" style="background: #ec4899; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                        🔍 연도별 분석 시작
+                    </button>
+                </div>
+
+                <div class="analysis-result" id="analysisResults">
+                    <div class="analysis-banner">
+                        <h2>✨ 분석이 완료되었습니다!</h2>
+                        <p>AI 기반 분석으로 환자 이탈을 미리 방지하고 수익을 최적화하세요</p>
+                    </div>
+                    <div class="kpi-grid">
+                        <div class="kpi-card"><div class="kpi-value" id="currentRetention">-</div><div class="kpi-label">현재 유지율</div><div class="kpi-change up" id="retentionChange"></div></div>
+                        <div class="kpi-card"><div class="kpi-value" id="totalPatients">-</div><div class="kpi-label">총 환자 수</div><div class="kpi-change" id="patientChange"></div></div>
+                        <div class="kpi-card"><div class="kpi-value" id="churnedPatients">-</div><div class="kpi-label">이탈 환자</div><div class="kpi-change down" id="churnChange"></div></div>
+                        <div class="kpi-card"><div class="kpi-value" id="newPatients">-</div><div class="kpi-label">신규 환자</div><div class="kpi-change" id="newChange"></div></div>
+                    </div>
+                    <div class="chart-section">
+                        <div class="chart-header"><h3 class="chart-title">📊 유지율 및 이탈율 추이</h3></div>
+                        <canvas id="retentionTrendChart" style="max-height: 300px;"></canvas>
+                    </div>
+                    <div class="charts-row">
+                        <div class="chart-section"><h3 class="chart-title">📊 연도별 환자 현황</h3><canvas id="monthlyPatientsChart" style="max-height: 320px;"></canvas></div>
+                        <div class="chart-section">
+                            <h3 class="chart-title">⭕ 최신 연도 유지/이탈</h3>
+                            <div class="donut-wrapper">
+                                <canvas id="retentionDonutChart" style="max-height: 200px;"></canvas>
+                                <div class="donut-center">
+                                    <div class="donut-center-label">유지율</div>
+                                    <div class="donut-center-value" id="donutCenterValue">-</div>
+                                    <div class="donut-center-sub">이탈</div>
+                                    <div class="donut-center-sub-value" id="donutSubValue">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="data-table-section">
+                        <h3 class="chart-title" style="margin-bottom: 16px;">📋 연도별 상세 데이터</h3>
+                        <table class="data-table"><thead><tr><th>연도</th><th style="text-align: center;">이월 환자</th><th style="text-align: center;">이탈 환자</th><th style="text-align: center;">총 환자수</th><th style="text-align: center;">유지율</th><th style="text-align: center;">실적</th></tr></thead><tbody id="analysisTableBody"></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ==================== Firebase 초기화 ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrU3rYs4fxlMkr8r0sjo70Mt0Al-HUtyg",
+            authDomain: "apseoncare-platform.firebaseapp.com",
+            projectId: "apseoncare-platform",
+            storageBucket: "apseoncare-platform.firebasestorage.app",
+            messagingSenderId: "515333523928",
+            appId: "1:515333523928:web:e19a9db63c522d8484caad"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // 전역 변수
+        let retentionTrendChart = null, monthlyPatientsChart = null, retentionDonutChart = null;
+        let selectedFiles = [], currentUser = null;
+        let growthCharts = {}, growthSelectedFiles = [];
+
+        // ==================== 로그인 ====================
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) { window.location.href = 'apsencare_login_firebase.html'; return; }
+            await loadUserInfo(user.uid);
+        });
+
+        async function loadUserInfo(uid) {
+            try {
+                const userDoc = await db.collection('users').doc(uid).get();
+                if (userDoc.exists) {
+                    const d = userDoc.data();
+                    currentUser = { ...d, uid };
+                    document.getElementById('userName').textContent = d.name || d.email;
+                    document.getElementById('userAvatar').textContent = d.name ? d.name.charAt(0) : '?';
+                    document.getElementById('userRole').textContent = d.userType === 'admin' ? '관리자' : '파트너 병원';
+                }
+            } catch (e) { console.error('사용자 정보 로드 오류:', e); }
+        }
+
+        async function handleLogout() {
+            if (confirm('로그아웃 하시겠습니까?')) { await auth.signOut(); window.location.href = 'apsencare_login_firebase.html'; }
+        }
+
+        // ====================================================================
+        //  Firestore 통계 결과값 저장 (개인정보 없음, 집계 통계만)
+        // ====================================================================
+        async function saveGrowthStats(data, facilityLabel) {
+            if (!currentUser || !currentUser.hospitalId) {
+                console.warn('⚠️ 사용자 정보 없음 - 통계 저장 건너뜀');
+                return;
+            }
+            try {
+                const latest = data[data.length - 1];
+                const prev = data.length >= 2 ? data[data.length - 2] : null;
+                const latestYoY = data.find(d => d.year === latest.year - 1 && d.month === latest.month);
+
+                // YoY 성장률 계산
+                let yoyGrowth = null;
+                if (latestYoY && latestYoY.sunap > 0) {
+                    yoyGrowth = parseFloat(((latest.sunap - latestYoY.sunap) / latestYoY.sunap * 100).toFixed(1));
+                }
+
+                // 월별 요약 (개인정보 없는 집계값만)
+                const monthlySummary = data.map(d => ({
+                    year: d.year,
+                    month: d.month,
+                    label: d.label,
+                    sunap: d.sunap,              // 수납합계
+                    patients: d.patients,         // 내원건수
+                    perPatient: d.perPatient,     // 객단가
+                    nonInsRatio: parseFloat(d.nonInsRatio.toFixed(1)),  // 비급여 비율
+                    totalFee: d.totalFee,         // 총진료비
+                    copay: d.copay,               // 본인부담금
+                    nhis: d.nhis,                 // 공단부담금
+                    nonIns: d.nonIns              // 비급여
+                }));
+
+                const statsDoc = {
+                    hospitalId: currentUser.hospitalId,
+                    hospitalName: currentUser.hospitalName || currentUser.name || '',
+                    analysisType: 'growth',
+                    // 핵심 KPI
+                    latestMonth: latest.label,
+                    latestSunap: latest.sunap,
+                    latestPatients: latest.patients,
+                    latestPerPatient: latest.perPatient,
+                    latestNonInsRatio: parseFloat(latest.nonInsRatio.toFixed(1)),
+                    yoyGrowth: yoyGrowth,
+                    momGrowth: prev && prev.sunap > 0 ? parseFloat(((latest.sunap - prev.sunap) / prev.sunap * 100).toFixed(1)) : null,
+                    // 분석 범위
+                    periodStart: data[0].label,
+                    periodEnd: latest.label,
+                    totalMonths: data.length,
+                    facilityType: facilityLabel || '병원(40:60)',
+                    // 월별 상세 (집계값만)
+                    monthlySummary: monthlySummary,
+                    // 메타
+                    analyzedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    analyzedBy: currentUser.uid
+                };
+
+                await db.collection('hospitalStats').doc(currentUser.hospitalId)
+                    .collection('growth').add(statsDoc);
+
+                // 최신 요약도 병원 문서에 업데이트
+                await db.collection('hospitalStats').doc(currentUser.hospitalId).set({
+                    hospitalId: currentUser.hospitalId,
+                    hospitalName: currentUser.hospitalName || currentUser.name || '',
+                    lastGrowthAnalysis: {
+                        latestMonth: latest.label,
+                        sunap: latest.sunap,
+                        yoyGrowth: yoyGrowth,
+                        patients: latest.patients,
+                        perPatient: latest.perPatient,
+                        nonInsRatio: parseFloat(latest.nonInsRatio.toFixed(1)),
+                        analyzedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    },
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+
+                console.log('✅ 수납 성장률 통계 Firestore 저장 완료');
+                showToast('📊 분석 결과가 저장되었습니다', 'success');
+            } catch (err) {
+                console.error('❌ 수납 통계 저장 실패:', err);
+                // 저장 실패해도 분석 결과 표시는 유지
+            }
+        }
+
+        async function saveRetentionStats(analysisData) {
+            if (!currentUser || !currentUser.hospitalId) {
+                console.warn('⚠️ 사용자 정보 없음 - 통계 저장 건너뜀');
+                return;
+            }
+            try {
+                const { years, yearlyStats, latestRetentionRate, totalUniquePatients } = analysisData;
+                const latestYear = years[years.length - 1];
+                const latestStat = yearlyStats[latestYear];
+
+                // 연도별 요약 (개인정보 없는 집계값만)
+                const yearlySummary = years.map(y => ({
+                    year: y,
+                    totalPatients: yearlyStats[y].totalPatients,
+                    retainedFromPrevious: yearlyStats[y].retainedFromPrevious,
+                    newPatients: yearlyStats[y].newPatients,
+                    churned: yearlyStats[y].churned,
+                    retentionRate: yearlyStats[y].retentionRate
+                }));
+
+                const statsDoc = {
+                    hospitalId: currentUser.hospitalId,
+                    hospitalName: currentUser.hospitalName || currentUser.name || '',
+                    analysisType: 'retention',
+                    // 핵심 KPI
+                    latestRetentionRate: latestRetentionRate,
+                    latestChurnRate: latestRetentionRate !== '신규' ? parseFloat((100 - parseFloat(latestRetentionRate)).toFixed(1)) : null,
+                    totalUniquePatients: totalUniquePatients,
+                    latestChurned: latestStat.churned,
+                    latestNewPatients: latestStat.newPatients,
+                    // 분석 범위
+                    periodStart: years[0] + '년',
+                    periodEnd: latestYear + '년',
+                    totalYears: years.length,
+                    // 연도별 상세 (집계값만)
+                    yearlySummary: yearlySummary,
+                    // 메타
+                    analyzedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    analyzedBy: currentUser.uid
+                };
+
+                await db.collection('hospitalStats').doc(currentUser.hospitalId)
+                    .collection('retention').add(statsDoc);
+
+                // 최신 요약도 병원 문서에 업데이트
+                await db.collection('hospitalStats').doc(currentUser.hospitalId).set({
+                    hospitalId: currentUser.hospitalId,
+                    hospitalName: currentUser.hospitalName || currentUser.name || '',
+                    lastRetentionAnalysis: {
+                        retentionRate: latestRetentionRate,
+                        churnRate: latestRetentionRate !== '신규' ? parseFloat((100 - parseFloat(latestRetentionRate)).toFixed(1)) : null,
+                        totalPatients: totalUniquePatients,
+                        churned: latestStat.churned,
+                        analyzedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    },
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+
+                console.log('✅ 유지율/이탈율 통계 Firestore 저장 완료');
+                showToast('📊 분석 결과가 저장되었습니다', 'success');
+            } catch (err) {
+                console.error('❌ 유지율 통계 저장 실패:', err);
+            }
+        }
+
+        // ==================== 초기화 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('uploadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+            document.getElementById('analyzeBtn').addEventListener('click', startAnalysis);
+            document.getElementById('growthUploadBtn').addEventListener('click', () => document.getElementById('growthFileInput').click());
+            document.getElementById('growthFileInput').addEventListener('change', handleGrowthFileSelect);
+            document.getElementById('growthAnalyzeBtn').addEventListener('click', startGrowthAnalysis);
+        });
+
+        // ==================== 탭 전환 ====================
+        function switchMainTab(tabId) {
+            document.querySelectorAll('.main-tab').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(tabId + '-tab').classList.add('active');
+        }
+        function switchGrowthSub(subId) {
+            document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.sub-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(subId + '-sub').classList.add('active');
+        }
+
+        // ====================================================================
+        //  수납액 성장률 - 체크리스트
+        // ====================================================================
+        function updateGrowthChecklist() {
+            const checks = [];
+            for (let i = 1; i <= 6; i++) checks.push(document.getElementById('gCheck' + i).checked);
+            document.querySelectorAll('#growthChecklist .checklist-item').forEach((item, idx) => {
+                item.querySelector('.warning-icon').textContent = checks[idx] ? '✅' : '❌';
+            });
+            const allChecked = checks.every(c => c);
+            const cl = document.getElementById('growthChecklist');
+            const btn = document.getElementById('growthUploadBtn');
+            if (allChecked) { cl.classList.add('complete'); btn.disabled = false; btn.textContent = '📤 월별 수납통계 파일 선택하기 (다중 선택 가능)'; }
+            else { cl.classList.remove('complete'); btn.disabled = true; btn.textContent = '🔒 보안 체크리스트를 먼저 확인해주세요'; }
+        }
+
+        // ====================================================================
+        //  의료기관 유형 선택 (병원/의원)
+        // ====================================================================
+        function getSelectedCopayRatio() {
+            const val = document.querySelector('input[name="facilityType"]:checked').value;
+            return val === 'hospital' ? 0.4 : 0.3;
+        }
+        function updateFacilityType() {
+            const isHospital = document.querySelector('input[name="facilityType"]:checked').value === 'hospital';
+            const hospEl = document.getElementById('facilityHospital');
+            const clinicEl = document.getElementById('facilityClinic');
+            hospEl.style.borderColor = isHospital ? '#ec4899' : '#e2e8f0';
+            hospEl.style.background = isHospital ? '#fdf2f8' : 'white';
+            clinicEl.style.borderColor = isHospital ? '#e2e8f0' : '#6366f1';
+            clinicEl.style.background = isHospital ? 'white' : '#eef2ff';
+            const pct = isHospital ? '40' : '30';
+            const nhisRatio = isHospital ? '60' : '70';
+            const ratio = isHospital ? 0.4 : 0.3;
+            document.getElementById('facilityDesc').innerHTML = `💡 공단부담금 = 본인부담금 ÷ ${ratio} × ${(1-ratio).toFixed(1)} 으로 추산됩니다 <span style="font-weight:600;">(본인부담 ${pct}% : 공단부담 ${nhisRatio}%)</span>`;
+        }
+
+        // ====================================================================
+        //  수납액 성장률 - 파일 업로드 (다중 파일)
+        // ====================================================================
+        function handleGrowthFileSelect(e) {
+            const newFiles = Array.from(e.target.files);
+            if (!newFiles.length) return;
+            // Append to existing selection (avoid duplicates by name)
+            newFiles.forEach(f => {
+                if (!growthSelectedFiles.some(ex => ex.name === f.name)) growthSelectedFiles.push(f);
+            });
+            renderGrowthFileList();
+        }
+        function renderGrowthFileList() {
+            const listEl = document.getElementById('growthFileList');
+            if (!growthSelectedFiles.length) {
+                document.getElementById('growthUploadedFiles').style.display = 'none';
+                return;
+            }
+            // Sort files by name for readability
+            growthSelectedFiles.sort((a, b) => a.name.localeCompare(b.name));
+            let html = `<div style="color:#6b7280;font-size:12px;margin-bottom:6px;">총 ${growthSelectedFiles.length}개 파일 선택됨</div>`;
+            growthSelectedFiles.forEach((f, i) => {
+                html += `<div class="file-item"><span>📄 ${f.name}</span><span style="color:#6b7280;font-size:12px;">(${(f.size/1024).toFixed(1)} KB)</span><button class="remove-btn" onclick="removeGrowthFileAt(${i})">✕</button></div>`;
+            });
+            listEl.innerHTML = html;
+            document.getElementById('growthUploadedFiles').style.display = 'block';
+        }
+        function removeGrowthFileAt(idx) {
+            growthSelectedFiles.splice(idx, 1);
+            renderGrowthFileList();
+            if (!growthSelectedFiles.length) document.getElementById('growthFileInput').value = '';
+        }
+        function removeGrowthFile() {
+            growthSelectedFiles = [];
+            document.getElementById('growthUploadedFiles').style.display = 'none';
+            document.getElementById('growthFileInput').value = '';
+        }
+
+        // ====================================================================
+        //  수납액 성장률 - 분석 시작
+        // ====================================================================
+        async function startGrowthAnalysis() {
+            if (!growthSelectedFiles.length) { showToast('파일을 선택해주세요.', 'error'); return; }
+            showLoading(`${growthSelectedFiles.length}개 파일 분석 중...`);
+            try {
+                // Parse all files and merge monthly data
+                const allMonthly = [];
+                for (const file of growthSelectedFiles) {
+                    const parsed = await parseRevenueExcel(file);
+                    parsed.forEach(p => {
+                        // Check if month already exists (from another file), merge if so
+                        const existing = allMonthly.find(e => e.year === p.year && e.month === p.month);
+                        if (existing) {
+                            existing.copay += p.copay;
+                            existing.nonIns += p.nonIns;
+                            existing.totalCollect += p.totalCollect;
+                            p.chartNos.forEach(c => existing.chartNos.add(c));
+                        } else {
+                            allMonthly.push(p);
+                        }
+                    });
+                }
+                if (allMonthly.length < 2) { hideLoading(); showToast('최소 2개월 이상의 데이터가 필요합니다. 더 많은 파일을 업로드해주세요.', 'error'); return; }
+                allMonthly.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+                // Calculate derived fields (선택된 의료기관 유형 비율 적용)
+                const COPAY_RATIO = getSelectedCopayRatio();
+                const facilityLabel = COPAY_RATIO === 0.4 ? '병원(40:60)' : '의원(30:70)';
+                allMonthly.forEach(d => {
+                    d.patients = d.chartNos.size;       // 내원건수 (차트번호+진료일 고유 조합)
+                    d.nhis = Math.round(d.copay / COPAY_RATIO * (1 - COPAY_RATIO)); // 공단부담금 역산
+                    d.insFee = d.copay + d.nhis;         // 보험비용 = 본인부담 + 공단부담
+                    d.totalFee = d.insFee + d.nonIns;    // 총진료비 = 보험비용 + 비급여
+                    d.sunap = d.copay + d.nonIns;        // 수납합계 = 본인부담 + 비급여
+                    d.perPatient = d.patients > 0 ? Math.round(d.totalFee / d.patients) : 0; // 객단가 = 총진료비 ÷ 내원건수
+                    d.nonInsRatio = d.totalFee > 0 ? (d.nonIns / d.totalFee * 100) : 0; // 비급여 비율 (총진료비 대비)
+                    delete d.chartNos; // 진료일·차트번호 조합 메모리에서 제거
+                });
+                hideLoading();
+                showGrowthResults(allMonthly, facilityLabel);
+                showToast(`수납액 분석 완료! (${allMonthly.length}개월) 🎉`, 'success');
+                // 🔥 Firestore에 통계 결과값 저장 (개인정보 없음)
+                saveGrowthStats(allMonthly, facilityLabel);
+            } catch (error) { hideLoading(); showToast('분석 오류: ' + error.message, 'error'); console.error(error); }
+        }
+
+        // ====================================================================
+        //  Excel 파싱 (수납통계 - 건별 트랜잭션 데이터)
+        // ====================================================================
+        async function parseRevenueExcel(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const wb = XLSX.read(e.target.result, { type: 'binary' });
+                        const monthlyMap = {}; // key: "YYYY-MM"
+
+                        wb.SheetNames.forEach(sheetName => {
+                            // 1) 시트 이름 또는 파일명에서 연월 추출
+                            let dateInfo = extractDateFromSheetName(sheetName);
+                            if (!dateInfo) dateInfo = extractDateFromFileName(file.name);
+                            if (!dateInfo) return;
+
+                            const key = `${dateInfo.year}-${String(dateInfo.month).padStart(2, '0')}`;
+                            if (!monthlyMap[key]) {
+                                monthlyMap[key] = {
+                                    year: dateInfo.year,
+                                    month: dateInfo.month,
+                                    label: `${dateInfo.year}.${dateInfo.month}월`,
+                                    copay: 0,    // 보험본인부담 진료금액 합
+                                    nonIns: 0,   // 비급여 진료금액 합
+                                    totalCollect: 0, // 총수납액 합 (실제 수납, 환불 포함)
+                                    chartNos: new Set()
+                                };
+                            }
+                            const rec = monthlyMap[key];
+
+                            // 2) 시트 데이터를 행별로 파싱
+                            const sheet = wb.Sheets[sheetName];
+                            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                            if (rows.length < 2) return;
+
+                            // 3) 헤더 행에서 컬럼 인덱스 자동 매핑
+                            const header = rows[0].map(h => String(h || '').trim());
+                            const colIdx = {
+                                sunapType: -1,  // 수납구분 (F)
+                                amount: -1,     // 진료금액 (G)
+                                chartNo: -1,    // 차트번호 (D)
+                                totalCollect: -1, // 총수납액 (H)
+                                treatDate: -1,  // 진료일 (C)
+                            };
+                            header.forEach((h, i) => {
+                                const hl = h.toLowerCase();
+                                if (h === '수납구분' || hl.includes('수납구분')) colIdx.sunapType = i;
+                                else if (h === '진료금액' || hl.includes('진료금액')) colIdx.amount = i;
+                                else if (h === '총수납액' || hl.includes('총수납액')) colIdx.totalCollect = i;
+                                else if (h === '차트번호' || hl.includes('차트번호') || hl.includes('차트no')) colIdx.chartNo = i;
+                                else if (h === '진료일' || hl.includes('진료일')) colIdx.treatDate = i;
+                            });
+
+                            // 필수 컬럼 확인
+                            if (colIdx.sunapType < 0 || colIdx.amount < 0) {
+                                console.warn(`시트 "${sheetName}": 수납구분 또는 진료금액 컬럼을 찾을 수 없음`);
+                                return;
+                            }
+
+                            // 4) 데이터 행 처리
+                            for (let r = 1; r < rows.length; r++) {
+                                const row = rows[r];
+                                if (!row || row.length < 2) continue;
+
+                                const sunapType = String(row[colIdx.sunapType] || '').trim();
+                                const amount = parseFloat(String(row[colIdx.amount] || '0').replace(/,/g, '')) || 0;
+                                const chartNo = colIdx.chartNo >= 0 ? String(row[colIdx.chartNo] || '').trim() : '';
+                                const treatDate = colIdx.treatDate >= 0 ? String(row[colIdx.treatDate] || '').trim() : '';
+                                const collect = colIdx.totalCollect >= 0
+                                    ? (parseFloat(String(row[colIdx.totalCollect] || '0').replace(/,/g, '')) || 0)
+                                    : 0;
+
+                                // 내원건수: 차트번호+진료일 조합으로 동일 환자 같은날 중복 제거
+                                if (chartNo && treatDate) rec.chartNos.add(chartNo + '|' + treatDate);
+
+                                // 총수납액은 환불(음수) 포함 전체 합산
+                                rec.totalCollect += collect;
+
+                                // 진료금액: 0 이하는 합산 스킵
+                                if (amount <= 0) continue;
+
+                                if (sunapType.includes('본인부담') || sunapType === '보험본인부담') {
+                                    rec.copay += amount;
+                                } else if (sunapType.includes('비급여')) {
+                                    rec.nonIns += amount;
+                                }
+                            }
+                        });
+
+                        resolve(Object.values(monthlyMap).filter(d => d.copay > 0 || d.nonIns > 0));
+                    } catch (err) { reject(err); }
+                };
+                reader.readAsBinaryString(file);
+            });
+        }
+
+        function extractDateFromSheetName(name) {
+            name = name.trim();
+            let m = name.match(/(\d{4})\s*[\.\-\/]\s*(\d{1,2})\s*월?/);
+            if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+            m = name.match(/(\d{4})\s*년\s*(\d{1,2})\s*월?/);
+            if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+            m = name.match(/(\d{2})\s*[\.\-\/]\s*(\d{1,2})/);
+            if (m) { const yr = parseInt(m[1]); return { year: yr < 50 ? 2000+yr : 1900+yr, month: parseInt(m[2]) }; }
+            m = name.match(/(\d{4})\s*[\.\-]?\s*(\d{2})/);
+            if (m) { const mo = parseInt(m[2]); if (mo >= 1 && mo <= 12) return { year: parseInt(m[1]), month: mo }; }
+            return null;
+        }
+
+        function extractDateFromFileName(filename) {
+            // 파일명 패턴: 2024-01-01_2024-01-31수납통계.xlsx
+            let m = filename.match(/(\d{4})-(\d{2})-\d{2}[_~](\d{4})-(\d{2})-\d{2}/);
+            if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+            // 파일명 패턴: 202401_수납통계.xlsx
+            m = filename.match(/(\d{4})(\d{2})/);
+            if (m) { const mo = parseInt(m[2]); if (mo >= 1 && mo <= 12) return { year: parseInt(m[1]), month: mo }; }
+            return null;
+        }
+
+        // ====================================================================
+        //  수납 분석 결과 표시
+        // ====================================================================
+        function showGrowthResults(data, facilityLabel) {
+            document.getElementById('growthResults').classList.add('show');
+            const latest = data[data.length - 1];
+            const prev = data.length >= 2 ? data[data.length - 2] : null;
+            const latestYoY = data.find(d => d.year === latest.year - 1 && d.month === latest.month);
+
+            const fmtWon = v => { if (v >= 1e8) return (v/1e8).toFixed(2)+'억'; if (v >= 1e4) return (v/1e4).toFixed(0)+'만'; return v.toLocaleString(); };
+            const fmtM = v => v >= 1e4 ? (v/1e4).toFixed(1)+'만' : v.toLocaleString();
+
+            document.getElementById('kpiTotalRevenue').textContent = fmtWon(latest.sunap);
+            document.getElementById('kpiPatientCount').textContent = latest.patients.toLocaleString() + '건';
+            document.getElementById('kpiPerPatient').textContent = fmtM(latest.perPatient) + '원';
+            document.getElementById('kpiNonInsRatio').textContent = latest.nonInsRatio.toFixed(1) + '%';
+
+            if (latestYoY && latestYoY.sunap > 0) {
+                const g = ((latest.sunap - latestYoY.sunap) / latestYoY.sunap * 100).toFixed(1);
+                document.getElementById('kpiYoyGrowth').textContent = (g > 0 ? '+' : '') + g + '%';
+                document.getElementById('kpiYoyGrowth').style.color = g >= 0 ? '#10b981' : '#ef4444';
+                document.getElementById('kpiYoyGrowthChange').textContent = `전년 동월(${latestYoY.label}) 대비`;
+            } else {
+                document.getElementById('kpiYoyGrowth').textContent = '-';
+                document.getElementById('kpiYoyGrowthChange').textContent = '전년 동월 데이터 없음';
+            }
+
+            if (prev) {
+                const pctChg = (cur, prv) => prv > 0 ? ((cur - prv) / prv * 100).toFixed(1) : '0';
+                const setChg = (id, val) => { const el = document.getElementById(id); el.textContent = `전월 대비 ${val > 0 ? '+' : ''}${val}%`; el.className = 'kpi-change ' + (val >= 0 ? 'up' : 'down'); };
+                setChg('kpiTotalRevenueChange', pctChg(latest.sunap, prev.sunap));
+                setChg('kpiPatientCountChange', pctChg(latest.patients, prev.patients));
+                setChg('kpiPerPatientChange', pctChg(latest.perPatient, prev.perPatient));
+                const rc = (latest.nonInsRatio - prev.nonInsRatio).toFixed(1);
+                const el = document.getElementById('kpiNonInsRatioChange');
+                el.textContent = `전월 대비 ${rc > 0 ? '+' : ''}${rc}%p`;
+                el.className = 'kpi-change ' + (rc >= 0 ? 'up' : 'down');
+            }
+
+            document.getElementById('growthBannerDesc').textContent = `${data[0].label} ~ ${latest.label} | ${data.length}개월 데이터 분석 | 적용 기준: ${facilityLabel || '병원(40:60)'}`;
+            const ratioText = facilityLabel || '병원 40:60';
+            document.getElementById('nhisColumnHeader').innerHTML = `공단부담금<span style="color:#6366f1;font-size:10px;"> (${ratioText} 추정)</span>`;
+            renderGrowthCharts(data);
+            renderGrowthTable(data);
+        }
+
+        // ====================================================================
+        //  차트 렌더링 (수납 성장률)
+        // ====================================================================
+        function renderGrowthCharts(data) {
+            const labels = data.map(d => d.label);
+            const C = { copay:'#6BC5A0', nhis:'#4F8FD8', nonIns:'#F2994A', total:'#1f2937', sunap:'#ec4899', perPat:'#8B5CF6', ratio:'#EB5757', patient:'#60A5FA' };
+            Object.values(growthCharts).forEach(c => c && c.destroy());
+            growthCharts = {};
+
+            // 1) 수납 구성 스택 바
+            growthCharts.stacked = new Chart(document.getElementById('revenueStackedChart'), {
+                type: 'bar', data: { labels, datasets: [
+                    { label: '본인부담금(보험)', data: data.map(d => d.copay), backgroundColor: C.copay, borderRadius: 2 },
+                    { label: '비급여', data: data.map(d => d.nonIns), backgroundColor: C.nonIns, borderRadius: 2 }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 12 } } } },
+                    scales: { x: { stacked: true, ticks: { font: { size: 11 }, maxRotation: 45 } }, y: { stacked: true, ticks: { callback: v => (v/1e4).toFixed(0)+'만' } } } }
+            });
+
+            // 2) 항목별 라인
+            growthCharts.line = new Chart(document.getElementById('revenueLineChart'), {
+                type: 'line', data: { labels, datasets: [
+                    { label: '본인부담금', data: data.map(d => d.copay), borderColor: C.copay, borderWidth: 2, tension: 0.3, pointRadius: 3, fill: false },
+                    { label: '공단부담금', data: data.map(d => d.nhis), borderColor: C.nhis, borderWidth: 2, tension: 0.3, pointRadius: 3, fill: false },
+                    { label: '비급여', data: data.map(d => d.nonIns), borderColor: C.nonIns, borderWidth: 2, tension: 0.3, pointRadius: 3, fill: false }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11 } } } },
+                    scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45 } }, y: { ticks: { callback: v => (v/1e4).toFixed(0)+'만' } } } }
+            });
+
+            // 3) 총진료비
+            growthCharts.totalFee = new Chart(document.getElementById('totalFeeChart'), {
+                type: 'line', data: { labels, datasets: [{ label: '총진료비', data: data.map(d => d.totalFee), borderColor: C.total, backgroundColor: C.total+'15', borderWidth: 3, tension: 0.3, pointRadius: 4, pointBackgroundColor: C.total, fill: true }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45 } }, y: { ticks: { callback: v => (v/1e4).toFixed(0)+'만' } } } }
+            });
+
+            // 4) 연도별 비교 탭 초기화
+            window._growthData = data; // 연도 선택 시 재렌더링용
+            initYearComparison(data);
+
+            // 5) 객단가
+            growthCharts.perPatient = new Chart(document.getElementById('perPatientChart'), {
+                type: 'line', data: { labels, datasets: [{ label: '객단가', data: data.map(d => d.perPatient), borderColor: C.perPat, backgroundColor: C.perPat+'15', borderWidth: 3, tension: 0.3, pointRadius: 4, pointBackgroundColor: C.perPat, fill: true }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45 } }, y: { ticks: { callback: v => (v/1e4).toFixed(1)+'만' } } } }
+            });
+
+            // 6) 비급여 비율 (30% 목표선 포함)
+            growthCharts.nonInsRatio = new Chart(document.getElementById('nonInsRatioChart'), {
+                type: 'line', data: { labels, datasets: [
+                    { label: '비급여 비율', data: data.map(d => d.nonInsRatio), borderColor: C.ratio, backgroundColor: C.ratio+'15', borderWidth: 3, tension: 0.3, pointRadius: 4, pointBackgroundColor: data.map(d => d.nonInsRatio >= 30 ? '#16a34a' : '#ef4444'), fill: true },
+                    { label: '목표 30%', data: data.map(() => 30), borderColor: '#16a34a', borderWidth: 2, borderDash: [8, 4], pointRadius: 0, fill: false }
+                ] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11 } } } },
+                    scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45 } }, y: { min: 0, max: 100, ticks: { callback: v => v+'%' } } } }
+            });
+
+            // 7) 내원건수 vs 객단가
+            growthCharts.volumePrice = new Chart(document.getElementById('volumePriceChart'), {
+                type: 'bar', data: { labels, datasets: [
+                    { label: '내원건수', data: data.map(d => d.patients), backgroundColor: C.patient+'60', borderColor: C.patient, borderWidth: 1, borderRadius: 4, yAxisID: 'y' },
+                    { label: '객단가', data: data.map(d => d.perPatient), type: 'line', borderColor: C.perPat, backgroundColor: C.perPat, borderWidth: 3, tension: 0.3, pointRadius: 4, pointBackgroundColor: C.perPat, yAxisID: 'y1' }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { usePointStyle: true } } },
+                    scales: { x: { ticks: { font: { size: 10 }, maxRotation: 45 } }, y: { position: 'left', title: { display: true, text: '내원건수' }, ticks: { callback: v => v+'건' } },
+                        y1: { position: 'right', title: { display: true, text: '객단가' }, ticks: { callback: v => (v/1e4).toFixed(1)+'만' }, grid: { drawOnChartArea: false } } } }
+            });
+        }
+
+        function renderGrowthTable(data) {
+            const fK = v => { const abs = Math.abs(v); const s = v < 0 ? '-' : ''; return abs >= 1e4 ? s+(abs/1e4).toFixed(0)+'만' : s+abs.toLocaleString(); };
+            document.getElementById('growthTableBody').innerHTML = data.map(d => {
+                let rc = 'status-below'; if (d.nonInsRatio >= 40) rc = 'status-excellent'; else if (d.nonInsRatio >= 30) rc = 'status-good';
+                return `<tr><td style="font-weight:600;">${d.label}</td><td style="text-align:right;">${fK(d.copay)}</td><td style="text-align:right;">${fK(d.nhis)}</td><td style="text-align:right;color:#F2994A;font-weight:600;">${fK(d.nonIns)}</td><td style="text-align:right;">${fK(d.totalFee)}</td><td style="text-align:right;">${d.patients.toLocaleString()}건</td><td style="text-align:right;font-weight:600;color:#ec4899;">${fK(d.sunap)}</td><td style="text-align:right;">${fK(d.perPatient)}원</td><td style="text-align:center;"><span class="status-badge ${rc}">${d.nonInsRatio.toFixed(1)}%</span></td></tr>`;
+            }).join('');
+        }
+
+        // ====================================================================
+        //  연도별 비교 기능
+        // ====================================================================
+        const yearColors = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
+        const yrCmpCharts = {};
+
+        function initYearComparison(data) {
+            const years = [...new Set(data.map(d => d.year))].sort();
+            const box = document.getElementById('yearSelectorBox');
+            box.innerHTML = years.map((y, i) => {
+                const checked = i >= years.length - 2; // 최근 2년 기본 선택
+                const color = yearColors[i % yearColors.length];
+                return `<label style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:${checked?'white':'#f8fafc'};border:2px solid ${checked?color:'#e2e8f0'};border-radius:8px;cursor:pointer;transition:all 0.2s;" id="yrLabel_${y}">
+                    <input type="checkbox" value="${y}" ${checked?'checked':''} onchange="onYearToggle()" style="accent-color:${color};width:16px;height:16px;">
+                    <span style="font-weight:600;color:${color};font-size:13px;">${y}년</span>
+                </label>`;
+            }).join('');
+            renderYearComparison();
+        }
+
+        function onYearToggle() {
+            // 체크박스 상태에 따라 라벨 스타일 업데이트
+            const years = [...new Set(window._growthData.map(d => d.year))].sort();
+            years.forEach((y, i) => {
+                const label = document.getElementById('yrLabel_' + y);
+                const cb = label.querySelector('input');
+                const color = yearColors[i % yearColors.length];
+                label.style.borderColor = cb.checked ? color : '#e2e8f0';
+                label.style.background = cb.checked ? 'white' : '#f8fafc';
+            });
+            renderYearComparison();
+        }
+
+        function renderYearComparison() {
+            const data = window._growthData;
+            if (!data) return;
+            const allYears = [...new Set(data.map(d => d.year))].sort();
+            const checks = document.querySelectorAll('#yearSelectorBox input[type=checkbox]:checked');
+            const selectedYears = [...checks].map(c => parseInt(c.value)).sort();
+            if (selectedYears.length === 0) return;
+
+            const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+            // 연도별 데이터 정리 (month -> value)
+            const byYear = {};
+            selectedYears.forEach(y => {
+                byYear[y] = {};
+                data.filter(d => d.year === y).forEach(d => { byYear[y][d.month] = d; });
+            });
+
+            // 차트 데이터셋 생성 함수
+            function makeDatasets(field, unit) {
+                return selectedYears.map((y, i) => {
+                    const ci = allYears.indexOf(y);
+                    const color = yearColors[ci % yearColors.length];
+                    return {
+                        label: y + '년',
+                        data: months.map((_, mi) => byYear[y][mi+1] ? byYear[y][mi+1][field] : null),
+                        borderColor: color, backgroundColor: color + '20',
+                        borderWidth: 3, tension: 0.3, pointRadius: 5,
+                        pointBackgroundColor: color, fill: false, spanGaps: true
+                    };
+                });
+            }
+
+            // 차트 공통 옵션
+            function chartOpts(tickCb) {
+                return { responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 12 } } } },
+                    scales: { x: { ticks: { font: { size: 11 } } }, y: { ticks: { callback: tickCb } } }
+                };
+            }
+
+            // 기존 차트 제거
+            Object.values(yrCmpCharts).forEach(c => c.destroy());
+
+            // 수납합계 비교
+            yrCmpCharts.sunap = new Chart(document.getElementById('yrCmpSunapChart'), {
+                type: 'line', data: { labels: months, datasets: makeDatasets('sunap') },
+                options: chartOpts(v => (v/1e4).toFixed(0)+'만')
+            });
+
+            // 내원건수 비교
+            yrCmpCharts.patient = new Chart(document.getElementById('yrCmpPatientChart'), {
+                type: 'line', data: { labels: months, datasets: makeDatasets('patients') },
+                options: chartOpts(v => v+'건')
+            });
+
+            // 객단가 비교
+            yrCmpCharts.unit = new Chart(document.getElementById('yrCmpUnitChart'), {
+                type: 'line', data: { labels: months, datasets: makeDatasets('perPatient') },
+                options: chartOpts(v => (v/1e4).toFixed(1)+'만')
+            });
+
+            // 비급여비율 비교 (30% 목표선 추가)
+            const ratioDs = makeDatasets('nonInsRatio');
+            ratioDs.push({ label: '목표 30%', data: months.map(() => 30), borderColor: '#16a34a', borderWidth: 2, borderDash: [8, 4], pointRadius: 0, fill: false });
+            yrCmpCharts.ratio = new Chart(document.getElementById('yrCmpRatioChart'), {
+                type: 'line', data: { labels: months, datasets: ratioDs },
+                options: { responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 12 } } } },
+                    scales: { x: { ticks: { font: { size: 11 } } }, y: { min: 0, ticks: { callback: v => v+'%' } } }
+                }
+            });
+
+            // 비교 테이블 렌더링
+            renderYearCmpTable(selectedYears, byYear, months);
+        }
+
+        function renderYearCmpTable(years, byYear, months) {
+            const fK = v => { if (v === null || v === undefined) return '-'; const abs = Math.abs(v); const s = v < 0 ? '-' : ''; return abs >= 1e4 ? s+(abs/1e4).toFixed(0)+'만' : s+abs.toLocaleString(); };
+            // 헤더: 월 | 연도1-수납 | 연도1-건수 | 연도1-비급여% | 연도2-수납 | ...
+            let headHtml = '<tr><th rowspan="2" style="vertical-align:middle;">월</th>';
+            years.forEach((y, i) => {
+                const ci = [...new Set(window._growthData.map(d => d.year))].sort().indexOf(y);
+                const color = yearColors[ci % yearColors.length];
+                headHtml += `<th colspan="4" style="text-align:center;color:${color};border-bottom:2px solid ${color};">${y}년</th>`;
+            });
+            headHtml += '</tr><tr>';
+            years.forEach(() => {
+                headHtml += '<th style="text-align:right;font-size:11px;">수납</th><th style="text-align:right;font-size:11px;">내원</th><th style="text-align:right;font-size:11px;">객단가</th><th style="text-align:center;font-size:11px;">비급여%</th>';
+            });
+            headHtml += '</tr>';
+            document.getElementById('yrCmpTableHead').innerHTML = headHtml;
+
+            // 바디
+            let bodyHtml = '';
+            for (let m = 1; m <= 12; m++) {
+                bodyHtml += `<tr><td style="font-weight:600;">${m}월</td>`;
+                years.forEach(y => {
+                    const d = byYear[y][m];
+                    if (d) {
+                        let rc = 'status-below'; if (d.nonInsRatio >= 40) rc = 'status-excellent'; else if (d.nonInsRatio >= 30) rc = 'status-good';
+                        bodyHtml += `<td style="text-align:right;">${fK(d.sunap)}</td>`;
+                        bodyHtml += `<td style="text-align:right;">${d.patients.toLocaleString()}건</td>`;
+                        bodyHtml += `<td style="text-align:right;">${fK(d.perPatient)}원</td>`;
+                        bodyHtml += `<td style="text-align:center;"><span class="status-badge ${rc}">${d.nonInsRatio.toFixed(1)}%</span></td>`;
+                    } else {
+                        bodyHtml += '<td style="text-align:center;color:#d1d5db;">-</td>'.repeat(4);
+                    }
+                });
+                bodyHtml += '</tr>';
+            }
+            document.getElementById('yrCmpTableBody').innerHTML = bodyHtml;
+        }
+
+        // ====================================================================
+        //  유지율/이탈율 탭 (기존 로직 그대로)
+        // ====================================================================
+        function updateChecklist() {
+            const checks = [document.getElementById('check1').checked, document.getElementById('check2').checked, document.getElementById('check3').checked, document.getElementById('check4').checked, document.getElementById('check5').checked, document.getElementById('check6').checked];
+            document.querySelectorAll('#uploadChecklist .checklist-item').forEach((item, i) => { item.querySelector('.warning-icon').textContent = checks[i] ? '✅' : '❌'; });
+            const allChecked = checks.every(c => c);
+            const cl = document.getElementById('uploadChecklist'), btn = document.getElementById('uploadBtn');
+            if (allChecked) { cl.classList.add('complete'); btn.disabled = false; btn.textContent = '📤 파일 선택하기'; }
+            else { cl.classList.remove('complete'); btn.disabled = true; btn.textContent = '🔒 체크리스트를 먼저 확인해주세요'; }
+        }
+
+        function handleFileSelect(e) {
+            selectedFiles = Array.from(e.target.files);
+            if (selectedFiles.length === 0) return;
+            document.getElementById('fileList').innerHTML = selectedFiles.map((f, i) => `<div class="file-item"><span>📄 ${f.name}</span><span style="color:#6b7280;font-size:12px;">(${(f.size/1024).toFixed(1)} KB)</span><button class="remove-btn" onclick="removeFile(${i})">✕</button></div>`).join('');
+            document.getElementById('uploadedFiles').style.display = 'block';
+        }
+        function removeFile(i) { selectedFiles.splice(i, 1); if (selectedFiles.length === 0) document.getElementById('uploadedFiles').style.display = 'none'; else handleFileSelect({ target: { files: selectedFiles } }); }
+
+        async function startAnalysis() {
+            if (selectedFiles.length === 0) { showToast('파일을 선택해주세요.', 'error'); return; }
+            showLoading('데이터 분석 중...');
+            try {
+                const allYearlyData = {};
+                for (const file of selectedFiles) {
+                    const fd = await parseExcelFile(file);
+                    for (const [year, patients] of Object.entries(fd)) { if (!allYearlyData[year]) allYearlyData[year] = new Set(); patients.forEach(p => allYearlyData[year].add(p)); }
+                }
+                const years = Object.keys(allYearlyData).map(Number).sort((a,b)=>a-b);
+                if (years.length === 0) { hideLoading(); showToast('연도 데이터를 찾을 수 없습니다.', 'error'); return; }
+                const yearlyStats = {}; let totalUnique = new Set();
+                years.forEach((year, idx) => {
+                    const cur = allYearlyData[year]; Array.from(cur).forEach(p => totalUnique.add(p));
+                    if (idx === 0) { yearlyStats[year] = { totalPatients: cur.size, retainedFromPrevious: 0, newPatients: cur.size, churned: 0, retentionRate: '신규' }; }
+                    else {
+                        const prev = allYearlyData[years[idx-1]];
+                        const retained = Array.from(cur).filter(p => prev.has(p)).length;
+                        const churned = Array.from(prev).filter(p => !cur.has(p)).length;
+                        const newP = Array.from(cur).filter(p => !prev.has(p)).length;
+                        yearlyStats[year] = { totalPatients: cur.size, retainedFromPrevious: retained, newPatients: newP, churned, retentionRate: prev.size > 0 ? ((retained/prev.size)*100).toFixed(1) : '0.0' };
+                    }
+                });
+                hideLoading();
+                showAnalysisResults({ years, yearlyStats, latestRetentionRate: yearlyStats[years[years.length-1]].retentionRate, totalUniquePatients: totalUnique.size });
+                showToast('분석 완료! 🎉', 'success');
+                // 🔥 Firestore에 통계 결과값 저장 (개인정보 없음)
+                saveRetentionStats({ years, yearlyStats, latestRetentionRate: yearlyStats[years[years.length-1]].retentionRate, totalUniquePatients: totalUnique.size });
+            } catch (err) { hideLoading(); showToast('분석 오류: ' + err.message, 'error'); console.error(err); }
+        }
+
+        async function parseExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const wb = XLSX.read(e.target.result, { type: 'binary' }), sheet = wb.Sheets[wb.SheetNames[0]], json = XLSX.utils.sheet_to_json(sheet), yp = {};
+                        json.forEach(row => {
+                            const pk = Object.keys(row).find(k => k.includes('환자')||k.includes('ID')||k.includes('id')||k.includes('차트'));
+                            const dk = Object.keys(row).find(k => k.includes('연도')||k.includes('년')||k.includes('날짜')||k.includes('date')||k.includes('접수')||k.includes('진료일')||k.includes('수납일')||k.includes('시각')||k.includes('일시')||k.includes('일자'));
+                            if (pk && row[pk]) {
+                                const pid = String(row[pk]).trim(); let yr;
+                                if (dk && row[dk]) {
+                                    const dv = row[dk];
+                                    if (dv instanceof Date) { yr = dv.getFullYear(); }
+                                    else if (typeof dv === 'number') { if (dv > 2000 && dv < 2100) yr = dv; else { try { const d = XLSX.SSF.parse_date_code(dv); yr = d.y; } catch(e) { yr = null; } } }
+                                    else { const m = String(dv).match(/20\d{2}/); yr = m ? parseInt(m[0]) : null; }
+                                }
+                                if (yr && pid) { if (!yp[yr]) yp[yr] = new Set(); yp[yr].add(pid); }
+                            }
+                        });
+                        const result = {}; for (const [y, p] of Object.entries(yp)) result[y] = Array.from(p);
+                        resolve(result);
+                    } catch (err) { reject(err); }
+                };
+                reader.readAsBinaryString(file);
+            });
+        }
+
+        function showAnalysisResults(data) {
+            document.getElementById('analysisResults').classList.add('show');
+            const ly = data.years[data.years.length-1], ls = data.yearlyStats[ly];
+            document.getElementById('currentRetention').textContent = data.latestRetentionRate + (data.latestRetentionRate !== '신규' ? '%' : '');
+            document.getElementById('totalPatients').textContent = data.totalUniquePatients.toLocaleString();
+            document.getElementById('churnedPatients').textContent = ls.churned.toLocaleString();
+            document.getElementById('newPatients').textContent = ls.newPatients.toLocaleString();
+            document.getElementById('analysisTableBody').innerHTML = data.years.map(y => {
+                const s = data.yearlyStats[y], r = parseFloat(s.retentionRate)||0;
+                let gt, gc;
+                if (s.retentionRate==='신규') { gt='신규'; gc='status-good'; } else if (r>=55) { gt='우수'; gc='status-excellent'; } else if (r>=50) { gt='양호'; gc='status-good'; } else { gt='보통'; gc='status-average'; }
+                return `<tr><td style="font-weight:600;">${y}년</td><td style="text-align:center;">${s.retainedFromPrevious.toLocaleString()}명</td><td style="text-align:center;color:#ef4444;">${s.churned.toLocaleString()}명</td><td style="text-align:center;font-weight:600;">${s.totalPatients.toLocaleString()}명</td><td style="text-align:center;font-weight:600;color:#ec4899;">${s.retentionRate}${s.retentionRate!=='신규'?'%':''}</td><td style="text-align:center;"><span class="status-badge ${gc}">${gt}</span></td></tr>`;
+            }).join('');
+            renderRetentionCharts(data);
+        }
+
+        function renderRetentionCharts(data) {
+            const yrs = data.years;
+            const rr = yrs.map(y => { const r = data.yearlyStats[y].retentionRate; return r==='신규'?null:parseFloat(r); });
+            const cr = rr.map(r => r===null?null:(100-r));
+            if (retentionTrendChart) retentionTrendChart.destroy();
+            retentionTrendChart = new Chart(document.getElementById('retentionTrendChart'), { type: 'line', data: { labels: yrs.map(y=>y+'년'), datasets: [{ label: '유지율 (%)', data: rr, borderColor: '#ec4899', backgroundColor: 'rgba(236,72,153,0.1)', borderWidth: 3, fill: true, tension: 0.4, pointRadius: 6, pointBackgroundColor: '#ec4899' }, { label: '이탈율 (%)', data: cr, borderColor: '#6b7280', backgroundColor: 'rgba(107,114,128,0.1)', borderWidth: 2, borderDash: [5,5], tension: 0.4, pointRadius: 4, pointBackgroundColor: '#6b7280' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { usePointStyle: true } } }, scales: { y: { min: 0, max: 100, ticks: { callback: v=>v+'%' } } } } });
+            if (monthlyPatientsChart) monthlyPatientsChart.destroy();
+            monthlyPatientsChart = new Chart(document.getElementById('monthlyPatientsChart'), { type: 'bar', data: { labels: yrs.map(y=>y+'년'), datasets: [{ label: '이월 환자', data: yrs.map(y=>data.yearlyStats[y].retainedFromPrevious), backgroundColor: '#ec4899', borderRadius: 4 }, { label: '신규 환자', data: yrs.map(y=>data.yearlyStats[y].newPatients), backgroundColor: '#f9a8d4', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { usePointStyle: true } } }, scales: { x: { stacked: true }, y: { stacked: true } } } });
+            if (retentionDonutChart) retentionDonutChart.destroy();
+            const ly = yrs[yrs.length-1], ls = data.yearlyStats[ly];
+            document.getElementById('donutCenterValue').textContent = ls.retentionRate + (ls.retentionRate!=='신규'?'%':'');
+            document.getElementById('donutSubValue').textContent = ls.churned.toLocaleString()+'명';
+            retentionDonutChart = new Chart(document.getElementById('retentionDonutChart'), { type: 'doughnut', data: { labels: ['유지 환자','이탈 환자'], datasets: [{ data: [ls.retainedFromPrevious, ls.churned], backgroundColor: ['#ec4899','#e5e7eb'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } } });
+        }
+
+        // ==================== 유틸리티 ====================
+        function showLoading(text) { document.getElementById('loadingText').textContent = text; document.getElementById('loadingOverlay').classList.add('show'); }
+        function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
+        function showToast(msg, type) { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast ' + type + ' show'; setTimeout(() => t.classList.remove('show'), 3000); }
+    </script>
+</body>
+</html>
