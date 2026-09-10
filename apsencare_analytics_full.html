@@ -342,7 +342,7 @@
                     <div class="checklist-category">✂️ 열 정제 확인</div>
                     <div class="checklist-item">
                         <input type="checkbox" id="gCheck1" onchange="updateGrowthChecklist()">
-                        <label for="gCheck1"><span class="warning-icon">❌</span> <strong>진료일, 차트번호, 수납구분, 진료금액, 총수납액</strong> 5개 열만 남기고 <strong>나머지는 모두 삭제</strong>했습니다</label>
+                        <label for="gCheck1"><span class="warning-icon">❌</span> 아래 안내된 <strong>분석용 열만 남기고</strong> 환자 이름 등 <strong>나머지는 모두 삭제</strong>했습니다</label>
                     </div>
                     <div class="checklist-item">
                         <input type="checkbox" id="gCheck2" onchange="updateGrowthChecklist()">
@@ -370,7 +370,7 @@
                     </div>
 
                     <div class="checklist-help">
-                        ✅ <strong>정제 후 허용 데이터:</strong> 진료일(내원건수 집계), 차트번호(내원건수 집계), 수납구분(보험/비급여 분류), 진료금액(금액 합산), 총수납액(미수/환불 분석) <strong>5개 열만</strong><br>
+                        ✅ <strong>정제 후 허용 데이터:</strong> 진료일·차트번호(내원건수 집계) + 금액 관련 열 <strong>(건별: 수납구분·진료금액·총수납액 / 금액열: 본인부담금·공단부담금·비급여·총진료비)</strong><br>
                         🛡️ <strong>안전 보장:</strong> 모든 분석은 브라우저(클라이언트) 내에서 처리되며, 파일이 서버에 업로드되거나 저장되지 않습니다<br>
                         ⚖️ <strong>법적 근거:</strong> 개인정보보호법 제17조, 의료법 제21조에 의거 환자 식별정보는 반드시 제거 후 업로드해야 합니다
                     </div>
@@ -404,8 +404,10 @@
                 <div class="upload-description">
                     <strong>📊 정제된 월별 수납통계 Excel 파일을 업로드하세요</strong> <span style="color:#6366f1; font-weight:600;">(여러 파일 동시 선택 가능)</span><br><br>
                     • 파일명은 원본 그대로 유지: <span style="color: #059669; font-weight: 600;">2024-01-01_2024-01-31수납통계.xlsx</span> (기간 자동 인식)<br>
-                    • 유지 열 5개: <strong style="color:#16a34a;">진료일, 차트번호, 수납구분, 진료금액, 총수납액</strong> — 나머지는 모두 삭제<br>
-                    • 공단부담금은 위에서 선택한 <strong>의료기관 유형 비율</strong>로 자동 추산됩니다<br>
+                    • 지원 양식 ① 건별: <strong style="color:#16a34a;">진료일, 차트번호, 수납구분, 진료금액, 총수납액</strong><br>
+                    • 지원 양식 ② 금액열: <strong style="color:#16a34a;">진료일, 차트번호, 본인부담금, 공단부담금, 비급여, 총진료비</strong><br>
+                    • 양식은 자동 인식되며, 제목·합계 행이 있어도 괜찮습니다<br>
+                    • 공단부담금은 파일에 값이 있으면 <strong>실제값</strong>을, 없으면 위에서 선택한 <strong>의료기관 유형 비율</strong>로 추산합니다<br>
                     • <span style="color: #dc2626; font-weight: 600;">최소 2개월</span> 이상의 파일을 업로드해야 추이 분석이 가능합니다
                 </div>
 
@@ -1010,6 +1012,7 @@
         }
         function renderGrowthFileList() {
             const listEl = document.getElementById('growthFileList');
+            const diagBox = document.getElementById('growthDiagBox'); if (diagBox) diagBox.style.display = 'none';
             if (!growthSelectedFiles.length) {
                 document.getElementById('growthUploadedFiles').style.display = 'none';
                 return;
@@ -1043,14 +1046,18 @@
             try {
                 // Parse all files and merge monthly data
                 const allMonthly = [];
+                const diags = [];
                 for (const file of growthSelectedFiles) {
-                    const parsed = await parseRevenueExcel(file);
-                    parsed.forEach(p => {
+                    const { months, diag } = await parseRevenueExcel(file);
+                    diags.push(diag);
+                    months.forEach(p => {
                         // Check if month already exists (from another file), merge if so
                         const existing = allMonthly.find(e => e.year === p.year && e.month === p.month);
                         if (existing) {
                             existing.copay += p.copay;
                             existing.nonIns += p.nonIns;
+                            existing.nhisActual += p.nhisActual;
+                            existing.hasActualNhis = existing.hasActualNhis && p.hasActualNhis;
                             existing.totalCollect += p.totalCollect;
                             p.chartNos.forEach(c => existing.chartNos.add(c));
                         } else {
@@ -1058,20 +1065,35 @@
                         }
                     });
                 }
-                if (allMonthly.length < 2) { hideLoading(); showToast('최소 2개월 이상의 데이터가 필요합니다. 더 많은 파일을 업로드해주세요.', 'error'); return; }
+                renderGrowthDiagnostics(diags);
+                console.table(diags);
+                if (allMonthly.length < 2) {
+                    hideLoading();
+                    const failCnt = diags.filter(d => d.status !== 'ok').length;
+                    showToast(failCnt
+                        ? `${failCnt}개 파일을 인식하지 못했습니다. 아래 '파일 인식 결과'를 확인해주세요.`
+                        : '최소 2개월 이상의 데이터가 필요합니다. 더 많은 파일을 업로드해주세요.', 'error');
+                    return;
+                }
                 allMonthly.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
-                // Calculate derived fields (선택된 의료기관 유형 비율 적용)
+                // 공단부담금: 파일에 실제값(총진료비/공단부담금 열)이 있으면 실제값, 없으면 의료기관 유형 비율로 추산
                 const COPAY_RATIO = getSelectedCopayRatio();
-                const facilityLabel = COPAY_RATIO === 0.4 ? '병원(40:60)' : '의원(30:70)';
+                const ratioLabel = COPAY_RATIO === 0.4 ? '병원(40:60)' : '의원(30:70)';
+                const actualCnt = allMonthly.filter(d => d.hasActualNhis).length;
+                const facilityLabel = actualCnt === allMonthly.length ? '실제 공단부담금(파일 기준)'
+                    : actualCnt > 0 ? `${ratioLabel} 추산 + 일부 실제값` : ratioLabel;
                 allMonthly.forEach(d => {
                     d.patients = d.chartNos.size;       // 내원건수 (차트번호+진료일 고유 조합)
-                    d.nhis = Math.round(d.copay / COPAY_RATIO * (1 - COPAY_RATIO)); // 공단부담금 역산
+                    d.nhis = d.hasActualNhis
+                        ? Math.round(d.nhisActual)                                   // 실제 공단부담금
+                        : Math.round(d.copay / COPAY_RATIO * (1 - COPAY_RATIO));    // 공단부담금 역산
                     d.insFee = d.copay + d.nhis;         // 보험비용 = 본인부담 + 공단부담
                     d.totalFee = d.insFee + d.nonIns;    // 총진료비 = 보험비용 + 비급여
                     d.sunap = d.copay + d.nonIns;        // 수납합계 = 본인부담 + 비급여
                     d.perPatient = d.patients > 0 ? Math.round(d.totalFee / d.patients) : 0; // 객단가 = 총진료비 ÷ 내원건수
                     d.nonInsRatio = d.totalFee > 0 ? (d.nonIns / d.totalFee * 100) : 0; // 비급여 비율 (총진료비 대비)
                     delete d.chartNos; // 진료일·차트번호 조합 메모리에서 제거
+                    delete d.nhisActual; delete d.hasActualNhis;
                 });
                 hideLoading();
                 showGrowthResults(allMonthly, facilityLabel);
@@ -1082,8 +1104,64 @@
         }
 
         // ====================================================================
-        //  Excel 파싱 (수납통계 - 건별 트랜잭션 데이터)
+        //  Excel 파싱 (수납통계) — 두 가지 양식 자동 인식
+        //   A) 건별 양식: 진료일 · 차트번호 · 수납구분 · 진료금액 · (총수납액)
+        //   B) 금액열 양식: 진료일 · 차트번호 · 본인부담금 · 공단부담금 · 비급여 · 총진료비
+        //  반환: { months: [...], diag: { file, status, format, months, rows, reason } }
         // ====================================================================
+        const normHeader = h => String(h == null ? '' : h).replace(/\s+/g, '').toLowerCase();
+        const toNum = v => {
+            if (v == null || v === '') return null;
+            if (typeof v === 'number') return isFinite(v) ? v : null;
+            const n = parseFloat(String(v).replace(/[,원\s]/g, ''));
+            return isNaN(n) ? null : n;
+        };
+        // "홍길동(1234)" → "1234", 숫자만 있으면 그대로
+        const toChartId = v => {
+            if (v == null) return '';
+            const s = String(v).trim();
+            const m = s.match(/\((\d+)\)/);
+            return m ? m[1] : s;
+        };
+
+        // 덴트웹 건별 양식(A) — 기존 배포 버전과 동일한 매칭 규칙 (변경 금지: 기존 결과와 동일성 보장)
+        function mapDentwebColumns(headerRow) {
+            const header = headerRow.map(h => String(h || '').trim());
+            const idx = { sunapType: -1, amount: -1, chartNo: -1, totalCollect: -1, treatDate: -1 };
+            header.forEach((h, i) => {
+                const hl = h.toLowerCase();
+                if (h === '수납구분' || hl.includes('수납구분')) idx.sunapType = i;
+                else if (h === '진료금액' || hl.includes('진료금액')) idx.amount = i;
+                else if (h === '총수납액' || hl.includes('총수납액')) idx.totalCollect = i;
+                else if (h === '차트번호' || hl.includes('차트번호') || hl.includes('차트no')) idx.chartNo = i;
+                else if (h === '진료일' || hl.includes('진료일')) idx.treatDate = i;
+            });
+            return (idx.sunapType >= 0 && idx.amount >= 0) ? { idx, format: 'A' } : null;
+        }
+        // 금액열 양식(B) — 본인부담금 · 공단부담금 · 비급여 · 총진료비
+        function mapAmountColumns(headerRow) {
+            const idx = { chartNo: -1, treatDate: -1, copayCol: -1, nhisCol: -1, nonInsCol: -1, totalFeeCol: -1 };
+            let altDate = -1;
+            headerRow.forEach((raw, i) => {
+                const h = normHeader(raw);
+                if (!h) return;
+                if (h.includes('차트')) idx.chartNo = i;
+                else if (h.includes('최초')) return;                       // 최초내원일 등은 제외
+                else if (h.includes('진료일')) idx.treatDate = i;
+                else if (h.includes('내원일') || h.includes('수납일')) { if (altDate < 0) altDate = i; }
+                else if (h.includes('본인부담')) idx.copayCol = i;
+                else if (h.includes('공단부담') || h.includes('보험자부담')) idx.nhisCol = i;
+                else if (h.includes('비급여') || h.includes('비보험')) idx.nonInsCol = i;
+                else if (h.includes('총진료비')) idx.totalFeeCol = i;
+            });
+            if (idx.treatDate < 0) idx.treatDate = altDate;
+            return (idx.copayCol >= 0 && (idx.nonInsCol >= 0 || idx.totalFeeCol >= 0)) ? { idx, format: 'B' } : null;
+        }
+        // 덴트웹 양식을 항상 먼저 확인 → 해당하지 않을 때만 금액열 양식 확인
+        function mapRevenueColumns(headerRow) {
+            return mapDentwebColumns(headerRow) || mapAmountColumns(headerRow) || { idx: null, format: null };
+        }
+
         async function parseRevenueExcel(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -1091,12 +1169,34 @@
                     try {
                         const wb = XLSX.read(e.target.result, { type: 'binary' });
                         const monthlyMap = {}; // key: "YYYY-MM"
+                        const diag = { file: file.name, status: 'fail', format: null, rows: 0, reason: '' };
+                        const foundHeaders = [];
 
                         wb.SheetNames.forEach(sheetName => {
                             // 1) 시트 이름 또는 파일명에서 연월 추출
                             let dateInfo = extractDateFromSheetName(sheetName);
                             if (!dateInfo) dateInfo = extractDateFromFileName(file.name);
-                            if (!dateInfo) return;
+                            if (!dateInfo) { diag.reason = diag.reason || '파일명·시트명에서 연월을 인식하지 못했습니다'; return; }
+
+                            // 2) 시트 데이터를 행별로 파싱
+                            const sheet = wb.Sheets[sheetName];
+                            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                            if (rows.length < 2) return;
+
+                            // 3) 헤더 행 탐색: 1행부터 확인 (덴트웹 양식 우선), 없으면 10행까지
+                            let headerRowIdx = -1, map = null;
+                            for (let r = 0; r < Math.min(10, rows.length); r++) {
+                                const cand = mapRevenueColumns(rows[r] || []);
+                                if (cand.format) { headerRowIdx = r; map = cand; break; }
+                            }
+                            if (headerRowIdx < 0) {
+                                const firstRow = (rows[0] || []).filter(v => v != null && v !== '').map(v => String(v).trim());
+                                foundHeaders.push(...firstRow);
+                                console.warn(`[${file.name}] 시트 "${sheetName}": 인식 가능한 열 구성이 없음`, firstRow);
+                                return;
+                            }
+                            const { idx: colIdx, format } = map;
+                            diag.format = diag.format || format;
 
                             const key = `${dateInfo.year}-${String(dateInfo.month).padStart(2, '0')}`;
                             if (!monthlyMap[key]) {
@@ -1104,78 +1204,124 @@
                                     year: dateInfo.year,
                                     month: dateInfo.month,
                                     label: `${dateInfo.year}.${dateInfo.month}월`,
-                                    copay: 0,    // 보험본인부담 진료금액 합
-                                    nonIns: 0,   // 비급여 진료금액 합
-                                    totalCollect: 0, // 총수납액 합 (실제 수납, 환불 포함)
+                                    copay: 0,          // 본인부담금 합
+                                    nonIns: 0,         // 비급여 합
+                                    totalCollect: 0,   // 총수납액 합 (실제 수납, 환불 포함) — 덴트웹 양식
+                                    nhisActual: 0,     // 실제 공단부담금 합 — 금액열 양식
+                                    hasActualNhis: false,
                                     chartNos: new Set()
                                 };
                             }
                             const rec = monthlyMap[key];
 
-                            // 2) 시트 데이터를 행별로 파싱
-                            const sheet = wb.Sheets[sheetName];
-                            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                            if (rows.length < 2) return;
+                            if (format === 'A') {
+                                // ── 덴트웹 건별 양식: 기존 배포 버전과 동일한 로직 (변경 금지) ──
+                                for (let r = headerRowIdx + 1; r < rows.length; r++) {
+                                    const row = rows[r];
+                                    if (!row || row.length < 2) continue;
+                                    diag.rows++;
 
-                            // 3) 헤더 행에서 컬럼 인덱스 자동 매핑
-                            const header = rows[0].map(h => String(h || '').trim());
-                            const colIdx = {
-                                sunapType: -1,  // 수납구분 (F)
-                                amount: -1,     // 진료금액 (G)
-                                chartNo: -1,    // 차트번호 (D)
-                                totalCollect: -1, // 총수납액 (H)
-                                treatDate: -1,  // 진료일 (C)
-                            };
-                            header.forEach((h, i) => {
-                                const hl = h.toLowerCase();
-                                if (h === '수납구분' || hl.includes('수납구분')) colIdx.sunapType = i;
-                                else if (h === '진료금액' || hl.includes('진료금액')) colIdx.amount = i;
-                                else if (h === '총수납액' || hl.includes('총수납액')) colIdx.totalCollect = i;
-                                else if (h === '차트번호' || hl.includes('차트번호') || hl.includes('차트no')) colIdx.chartNo = i;
-                                else if (h === '진료일' || hl.includes('진료일')) colIdx.treatDate = i;
-                            });
+                                    const sunapType = String(row[colIdx.sunapType] || '').trim();
+                                    const amount = parseFloat(String(row[colIdx.amount] || '0').replace(/,/g, '')) || 0;
+                                    const chartNo = colIdx.chartNo >= 0 ? String(row[colIdx.chartNo] || '').trim() : '';
+                                    const treatDate = colIdx.treatDate >= 0 ? String(row[colIdx.treatDate] || '').trim() : '';
+                                    const collect = colIdx.totalCollect >= 0
+                                        ? (parseFloat(String(row[colIdx.totalCollect] || '0').replace(/,/g, '')) || 0)
+                                        : 0;
 
-                            // 필수 컬럼 확인
-                            if (colIdx.sunapType < 0 || colIdx.amount < 0) {
-                                console.warn(`시트 "${sheetName}": 수납구분 또는 진료금액 컬럼을 찾을 수 없음`);
+                                    // 내원건수: 차트번호+진료일 조합으로 동일 환자 같은날 중복 제거
+                                    if (chartNo && treatDate) rec.chartNos.add(chartNo + '|' + treatDate);
+
+                                    // 총수납액은 환불(음수) 포함 전체 합산
+                                    rec.totalCollect += collect;
+
+                                    // 진료금액: 0 이하는 합산 스킵
+                                    if (amount <= 0) continue;
+
+                                    if (sunapType.includes('본인부담') || sunapType === '보험본인부담') {
+                                        rec.copay += amount;
+                                    } else if (sunapType.includes('비급여')) {
+                                        rec.nonIns += amount;
+                                    }
+                                }
                                 return;
                             }
 
-                            // 4) 데이터 행 처리
-                            for (let r = 1; r < rows.length; r++) {
+                            // ── 금액열 양식 (본인부담금·공단부담금·비급여·총진료비) ──
+                            if (colIdx.nhisCol >= 0 || colIdx.totalFeeCol >= 0) rec.hasActualNhis = true;
+                            for (let r = headerRowIdx + 1; r < rows.length; r++) {
                                 const row = rows[r];
-                                if (!row || row.length < 2) continue;
+                                if (!row || row.every(v => v == null || v === '')) continue;
+                                // 합계/소계 행 제외
+                                if (row.some(v => typeof v === 'string' && /^(총?합계|소계|계)$/.test(v.replace(/\s/g, '')))) continue;
 
-                                const sunapType = String(row[colIdx.sunapType] || '').trim();
-                                const amount = parseFloat(String(row[colIdx.amount] || '0').replace(/,/g, '')) || 0;
-                                const chartNo = colIdx.chartNo >= 0 ? String(row[colIdx.chartNo] || '').trim() : '';
-                                const treatDate = colIdx.treatDate >= 0 ? String(row[colIdx.treatDate] || '').trim() : '';
-                                const collect = colIdx.totalCollect >= 0
-                                    ? (parseFloat(String(row[colIdx.totalCollect] || '0').replace(/,/g, '')) || 0)
-                                    : 0;
+                                const chartNo = colIdx.chartNo >= 0 ? toChartId(row[colIdx.chartNo]) : '';
+                                const treatDateRaw = colIdx.treatDate >= 0 ? row[colIdx.treatDate] : null;
+                                const treatDate = treatDateRaw == null ? '' : String(treatDateRaw).trim();
+                                // 진료일·차트번호가 모두 비어 있으면 합계/수식 행 → 제외
+                                if ((colIdx.chartNo >= 0 || colIdx.treatDate >= 0) && !chartNo && !treatDate) continue;
 
-                                // 내원건수: 차트번호+진료일 조합으로 동일 환자 같은날 중복 제거
+                                const copay = toNum(row[colIdx.copayCol]) || 0;
+                                const nonIns = colIdx.nonInsCol >= 0 ? (toNum(row[colIdx.nonInsCol]) || 0) : 0;
+                                const totalFee = colIdx.totalFeeCol >= 0 ? toNum(row[colIdx.totalFeeCol]) : null;
+                                const nhisCell = colIdx.nhisCol >= 0 ? toNum(row[colIdx.nhisCol]) : null;
+                                // 금액도 차트번호도 없는 행 제외 — 0원 내원은 내원건수에 포함
+                                if (!copay && !nonIns && !totalFee && !nhisCell && !chartNo) continue;
+                                // 공단부담금: 총진료비가 있으면 역산(수식 캐시 누락 대비), 없으면 열 값 사용
+                                const nhis = totalFee != null ? (totalFee - copay - nonIns) : (nhisCell || 0);
+                                rec.copay += copay;
+                                rec.nonIns += nonIns;
+                                rec.nhisActual += nhis;
                                 if (chartNo && treatDate) rec.chartNos.add(chartNo + '|' + treatDate);
-
-                                // 총수납액은 환불(음수) 포함 전체 합산
-                                rec.totalCollect += collect;
-
-                                // 진료금액: 0 이하는 합산 스킵
-                                if (amount <= 0) continue;
-
-                                if (sunapType.includes('본인부담') || sunapType === '보험본인부담') {
-                                    rec.copay += amount;
-                                } else if (sunapType.includes('비급여')) {
-                                    rec.nonIns += amount;
-                                }
+                                else if (chartNo) rec.chartNos.add(chartNo + '|' + r);
+                                diag.rows++;
                             }
                         });
 
-                        resolve(Object.values(monthlyMap).filter(d => d.copay > 0 || d.nonIns > 0));
+                        const months = Object.values(monthlyMap).filter(d => d.copay > 0 || d.nonIns > 0);
+                        if (months.length) {
+                            diag.status = 'ok';
+                            diag.months = months.map(m => m.label).join(', ');
+                        } else if (!diag.reason) {
+                            if (!diag.format) {
+                                const shown = [...new Set(foundHeaders)].slice(0, 8).join(', ');
+                                diag.reason = `필요한 열을 찾지 못했습니다${shown ? ` (1행: ${shown})` : ''}`;
+                            } else {
+                                diag.reason = '열은 인식했지만 합산된 금액이 0원입니다 (수납구분 값 또는 금액 형식 확인 필요)';
+                            }
+                        }
+                        resolve({ months, diag });
                     } catch (err) { reject(err); }
                 };
+                reader.onerror = () => reject(new Error(`${file.name} 파일을 읽을 수 없습니다`));
                 reader.readAsBinaryString(file);
             });
+        }
+
+        // 파일별 인식 결과 표시
+        function renderGrowthDiagnostics(diags) {
+            let box = document.getElementById('growthDiagBox');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'growthDiagBox';
+                box.style.cssText = 'margin-top:12px;padding:14px 16px;border-radius:10px;font-size:13px;line-height:1.7;';
+                document.getElementById('growthAnalyzeBtn').insertAdjacentElement('afterend', box);
+            }
+            const ok = diags.filter(d => d.status === 'ok');
+            const fail = diags.filter(d => d.status !== 'ok');
+            const fmtName = f => f === 'A' ? '건별 양식' : f === 'B' ? '금액열 양식' : '-';
+            box.style.background = fail.length ? '#fef2f2' : '#f0fdf4';
+            box.style.border = `1px solid ${fail.length ? '#fecaca' : '#bbf7d0'}`;
+            let html = `<div style="font-weight:700;margin-bottom:4px;">🔎 파일 인식 결과: ✅ ${ok.length}개 성공${fail.length ? ` · <span style="color:#dc2626;">❌ ${fail.length}개 실패</span>` : ''}</div>`;
+            if (ok.length) {
+                const formats = [...new Set(ok.map(d => fmtName(d.format)))].join(', ');
+                html += `<div style="color:#4b5563;">인식된 양식: ${formats}</div>`;
+            }
+            fail.forEach(d => {
+                html += `<div style="color:#991b1b;">• <strong>${d.file}</strong> — ${d.reason}</div>`;
+            });
+            box.innerHTML = html;
+            box.style.display = 'block';
         }
 
         function extractDateFromSheetName(name) {
@@ -1242,7 +1388,7 @@
 
             document.getElementById('growthBannerDesc').textContent = `${data[0].label} ~ ${latest.label} | ${data.length}개월 데이터 분석 | 적용 기준: ${facilityLabel || '병원(40:60)'}`;
             const ratioText = facilityLabel || '병원 40:60';
-            document.getElementById('nhisColumnHeader').innerHTML = `공단부담금<span style="color:#6366f1;font-size:10px;"> (${ratioText} 추정)</span>`;
+            document.getElementById('nhisColumnHeader').innerHTML = ratioText.startsWith('실제') ? `공단부담금<span style="color:#16a34a;font-size:10px;"> (실제)</span>` : `공단부담금<span style="color:#6366f1;font-size:10px;"> (${ratioText} 추정)</span>`;
             renderGrowthCharts(data);
             renderGrowthTable(data);
         }
